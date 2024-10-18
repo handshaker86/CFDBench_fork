@@ -54,13 +54,14 @@ def init_model(args: Args) -> AutoCfdModel:
     elif args.model == "auto_deeponet":
         branch_dim = n_cols * n_rows + n_case_params
         model = AutoDeepONet(
-            branch_dim=branch_dim,  # +2 因为物性
+            branch_dim=branch_dim,
             trunk_dim=2,  # (x, y)
             loss_fn=loss_fn,
             width=args.deeponet_width,
             trunk_depth=args.trunk_depth,
             branch_depth=args.branch_depth,
             act_name=args.act_fn,
+            velocity_dim=args.velocity_dim,
         ).cuda()
         return model
     elif args.model == "auto_edeeponet":

@@ -37,9 +37,7 @@ def plot_predictions(
     pred: Tensor,
     out_dir: Path,
     step: int,
-    inp: Optional[
-        Tensor
-    ] = None,  # non-autoregressive input func. is not plottable.
+    inp: Optional[Tensor] = None,  # non-autoregressive input func. is not plottable.
 ):
     assert all([isinstance(x, Tensor) for x in [label, pred]])
     assert label.shape == pred.shape, f"{label.shape}, {pred.shape}"
@@ -77,18 +75,12 @@ def plot_predictions(
         plt.clf()
 
     plt.axis("off")
-    plt.imshow(
-        label_arr, vmin=label_arr.min(), vmax=label_arr.max(), cmap="coolwarm"
-    )
-    plt.savefig(
-        label_dir / f"{step:04}.png", bbox_inches="tight", pad_inches=0
-    )
+    plt.imshow(label_arr, vmin=label_arr.min(), vmax=label_arr.max(), cmap="coolwarm")
+    plt.savefig(label_dir / f"{step:04}.png", bbox_inches="tight", pad_inches=0)
     plt.clf()
 
     plt.axis("off")
-    plt.imshow(
-        pred_arr, vmin=pred_arr.min(), vmax=pred_arr.max(), cmap="coolwarm"
-    )
+    plt.imshow(pred_arr, vmin=pred_arr.min(), vmax=pred_arr.max(), cmap="coolwarm")
     plt.savefig(pred_dir / f"{step:04}.png", bbox_inches="tight", pad_inches=0)
     plt.clf()
 
@@ -106,9 +98,7 @@ def plot(inp: Tensor, label: Tensor, pred: Tensor, out_path: Path):
 
     # Create a figure with 6 subplots
     fig, axs = plt.subplots(nrows=1, ncols=3, figsize=(10, 5))
-    plt.subplots_adjust(
-        left=0.0, right=1, bottom=0.0, top=1, wspace=0, hspace=0
-    )
+    plt.subplots_adjust(left=0.0, right=1, bottom=0.0, top=1, wspace=0, hspace=0)
     # [left, bottom, width, height]
     # cbar_ax = fig.add_axes([0.92, 0.15, 0.01, 0.7])
 
@@ -158,6 +148,38 @@ def plot_loss(losses, out: Path, fontsize: int = 12, linewidth: int = 2):
     plt.close()
 
 
+def plot_flow_field(u, v, color: str, label: str, ax):
+
+    # Create a meshgrid for the coordinates
+    x, y = np.meshgrid(np.arange(u.shape[1]), np.arange(u.shape[0]))
+
+    # Create a quiver plot in the given axis
+    ax.quiver(x, y, u, v, scale=30, color=color, width=0.005)
+    ax.set_title(f"Flow Field - {label}")
+    ax.set_xlabel("X-axis")
+    ax.set_ylabel("Y-axis")
+
+
+def generate_frame(u_real_frame, v_real_frame, u_pred_frame, v_pred_frame):
+    for i in range(v_real_frame.shape[0]):
+        v_r = v_real_frame[i, :, :]
+        u_r = u_real_frame[i, :, :]
+        v_p = v_pred_frame[i, :, :]
+        u_p = u_pred_frame[i, :, :]
+
+        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+        plot_flow_field(u_r, v_r, "g", f"Real Field - Frame {i+1}", axs[0])
+
+        plot_flow_field(u_p, v_p, "g", f"Predicted Field - Frame {i+1}", axs[1])
+
+        # Adjust layout and show the figure
+        plt.tight_layout()
+        plt.show()
+        plt.clf()
+        plt.close()
+
+
 def get_best_ckpt(output_dir: Path) -> Union[Path, None]:
     """
     Returns None if there is no ckpt-* directory in output_dir
@@ -188,6 +210,11 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         args.model,
     )
     if args.model == "deeponet":
+        if args.velocity_dim == 0:
+            velocity_dim = "u"
+        else:
+            velocity_dim = "v"
+
         dir_name = (
             f"lr{args.lr}"
             + f"_width{args.deeponet_width}"
@@ -198,13 +225,13 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             + f"-{args.act_scale_invariant}"
             + f"-{args.act_on_output}"
         )
+
         output_dir /= dir_name
+        output_dir /= velocity_dim
         return output_dir
     elif args.model == "unet":
         dir_name = (
-            f"lr{args.lr}"
-            f"_d{args.unet_dim}"
-            f"_cp{args.unet_insert_case_params_at}"
+            f"lr{args.lr}" f"_d{args.unet_dim}" f"_cp{args.unet_insert_case_params_at}"
         )
         output_dir /= dir_name
         return output_dir
@@ -220,9 +247,7 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         return output_dir
     elif args.model == "resnet":
         dir_name = (
-            f"lr{args.lr}"
-            f"_d{args.resnet_depth}"
-            f"_w{args.resnet_hidden_chan}"
+            f"lr{args.lr}" f"_d{args.resnet_depth}" f"_w{args.resnet_hidden_chan}"
         )
         return output_dir / dir_name
     elif args.model == "auto_edeeponet":
@@ -249,18 +274,14 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         return output_dir / dir_name
     elif args.model == "auto_ffn":
         dir_name = (
-            f"lr{args.lr}"
-            f"_width{args.autoffn_width}"
-            f"_depth{args.autoffn_depth}"
+            f"lr{args.lr}" f"_width{args.autoffn_width}" f"_depth{args.autoffn_depth}"
         )
         return output_dir / dir_name
     elif args.model == "auto_deeponet_cnn":
         dir_name = f"lr{args.lr}" f"_depth{args.autoffn_depth}"
         return output_dir / dir_name
     elif args.model == "ffn":
-        dir_name = (
-            f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
-        )
+        dir_name = f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
         return output_dir / dir_name
     else:
         raise NotImplementedError
@@ -273,3 +294,11 @@ def load_best_ckpt(model, output_dir: Path):
     print(f"Loading best checkpoint from {best_ckpt_dir}")
     ckpt_path = best_ckpt_dir / "model.pt"
     load_ckpt(model, ckpt_path)
+
+
+def get_dir_nums(dir: Path):
+    return sum(1 for f in dir.iterdir() if f.is_dir())
+
+
+def check_file_exists(file_path):
+    return Path(file_path).is_file()

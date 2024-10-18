@@ -45,6 +45,7 @@ class AutoDeepONet(AutoCfdModel):
         act_name="relu",
         act_norm: bool = False,
         act_on_output: bool = False,
+        velocity_dim: int = 0,
     ):
         """
         Args:
@@ -72,6 +73,7 @@ class AutoDeepONet(AutoCfdModel):
         )
         self.trunk_net = Ffn(self.trunk_dims, act_fn=act_fn)
         self.bias = nn.Parameter(torch.zeros(1))  # type: ignore
+        self.velocity_dim = velocity_dim
 
     def forward(
         self,
@@ -107,7 +109,7 @@ class AutoDeepONet(AutoCfdModel):
         """
         batch_size, num_chan, height, width = inputs.shape
         # Only use the u channel
-        inputs = inputs[:, 0]  # (B, h, w)
+        inputs = inputs[:, self.velocity_dim]  # (B, h, w)
         # Flatten
         flat_inputs = inputs.view(batch_size, -1)  # (B, h * w)
 
@@ -146,9 +148,7 @@ class AutoDeepONet(AutoCfdModel):
         preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
         return dict(preds=preds)
 
-    def generate(
-        self, inputs: Tensor, case_params: Tensor, mask: Tensor
-    ) -> Tensor:
+    def generate(self, inputs: Tensor, case_params: Tensor, mask: Tensor) -> Tensor:
         """
         x: (c, h, w) or (B, c, h, w)
 
