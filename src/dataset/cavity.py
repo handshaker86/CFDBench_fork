@@ -405,7 +405,7 @@ def get_cavity_auto_datasets(
 ):
     print(data_dir, case_name)
     case_dirs = []
-    for name in ["prop", "bc", "geo"]:
+    for name in ["bc", "geo","prop"]:
         if name in case_name:
             case_dir = data_dir / name
             print(f"Getting cases from: {case_dir}")
