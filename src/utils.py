@@ -163,6 +163,13 @@ def plot_flow_field(u, v, color: str, label: str, ax):
 def generate_frame(
     u_real_frame, v_real_frame, u_pred_frame, v_pred_frame, save_path: Path
 ):
+    assert (
+        u_real_frame.shape
+        == v_real_frame.shape
+        == u_pred_frame.shape
+        == v_pred_frame.shape
+    )
+
     for i in range(v_real_frame.shape[0]):
         v_r = v_real_frame[i, :, :]
         u_r = u_real_frame[i, :, :]

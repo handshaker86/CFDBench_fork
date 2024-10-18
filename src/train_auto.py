@@ -370,9 +370,11 @@ def main():
             plot_interval=10,
         )
 
-        trained_velocity_dims = get_dir_nums(output_dir.parent)
-        if trained_velocity_dims == 2:
-            get_visualize_result(test_data.labels, output_dir.parent)
+        parent = output_dir.parent
+        u_result_path = parent / "u"
+        v_result_path = parent / "v"
+        if u_result_path.is_dir() and v_result_path.is_dir():
+            get_visualize_result(test_data.labels, parent)
 
 
 if __name__ == "__main__":
