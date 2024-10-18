@@ -25,9 +25,11 @@ from utils import (
     get_output_dir,
     load_best_ckpt,
     plot_predictions,
+    get_dir_nums,
 )
 from utils_auto import init_model
 from args import Args
+from get_result import get_visualize_result
 
 
 def collate_fn(batch: list):
@@ -42,9 +44,7 @@ def collate_fn(batch: list):
     inputs = inputs[:, :-1]  # (b, 2, h, w)
 
     # Case params is a dict, turn it into a tensor
-    keys = [
-        x for x in case_params[0].keys() if x not in ["rotated", "dx", "dy"]
-    ]
+    keys = [x for x in case_params[0].keys() if x not in ["rotated", "dx", "dy"]]
     case_params_vec = []
     for case_param in case_params:
         case_params_vec.append([case_param[k] for k in keys])
@@ -90,9 +90,7 @@ def evaluate(
             labels = batch["label"]  # (b, 2, h, w)
 
             # Compute difference between the input and label
-            input_loss: dict = model.loss_fn(
-                labels=labels[:, :1], preds=inputs[:, :1]
-            )
+            input_loss: dict = model.loss_fn(labels=labels[:, :1], preds=inputs[:, :1])
             for key in input_scores:
                 input_scores[key].append(input_loss[key].cpu().tolist())
 
@@ -100,7 +98,7 @@ def evaluate(
             outputs: dict = model(**batch)
             loss: dict = outputs["loss"]
             preds: Tensor = outputs["preds"]
-            height, width = labels.shape[2:]
+            height, width = inputs.shape[2:]
 
             # When using DeepONetAuto, the prediction is a flattened.
             preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
@@ -140,7 +138,7 @@ def evaluate(
 
     plot_loss(scores["nmse"], output_dir / "loss.png")
     return dict(
-        preds=torch.cat(all_preds, dim=0),
+        preds=torch.cat(all_preds, dim=0),  # preds: (all_frames, 1, h, w)
         scores=dict(
             mean=avg_scores,
             all=scores,
@@ -171,7 +169,7 @@ def test(
         plot_interval=plot_interval,
         measure_time=measure_time,
     )
-    preds = result["preds"]
+    preds = torch.squeeze(result["preds"], 1)  # preds: (all_frames, h, w)
     scores = result["scores"]
     torch.save(preds, output_dir / "preds.pt")
     dump_json(scores, output_dir / "scores.json")
@@ -211,9 +209,7 @@ def train(
     output_dir.mkdir(exist_ok=True, parents=True)
 
     optimizer = Adam(model.parameters(), lr=lr)
-    scheduler = lr_scheduler.StepLR(
-        optimizer, step_size=lr_step_size, gamma=lr_gamma
-    )
+    scheduler = lr_scheduler.StepLR(optimizer, step_size=lr_step_size, gamma=lr_gamma)
 
     print("====== Training ======")
     print(f"# batch: {batch_size}")
@@ -284,9 +280,7 @@ def train(
         if (ep + 1) % eval_interval == 0:
             ckpt_dir = output_dir / f"ckpt-{ep}"
             ckpt_dir.mkdir(exist_ok=True, parents=True)
-            result = evaluate(
-                model, dev_data, ckpt_dir, batch_size=eval_batch_size
-            )
+            result = evaluate(model, dev_data, ckpt_dir, batch_size=eval_batch_size)
             dev_scores = result["scores"]
             dump_json(dev_scores, ckpt_dir / "dev_scores.json")
             dump_json(ep_train_losses, ckpt_dir / "train_loss.json")
@@ -375,6 +369,10 @@ def main():
             infer_steps=20,
             plot_interval=10,
         )
+
+        trained_velocity_dims = get_dir_nums(output_dir.parent)
+        if trained_velocity_dims == 2:
+            get_visualize_result(test_data.labels, output_dir.parent)
 
 
 if __name__ == "__main__":
