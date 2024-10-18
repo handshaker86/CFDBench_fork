@@ -21,7 +21,7 @@ class Args(Tap):
     mode: str = "train_test"
     """"train" or "test" for train/test only"""
 
-    model: str = "deeponet"
+    model: str = "auto_deeponet"
     """
     For autoregressive modeling (`train_auto.py`), it must be one of: ['auto_ffn', 'auto_deeponet', 'auto_edeeponet', 'auto_deeponet_cnn', 'unet', 'fno', 'resnet'],
     for non-autoregressive modeling (`train.py`), it must be one of: ['ffn', 'deeponet'].
@@ -35,14 +35,14 @@ class Args(Tap):
     eval_batch_size: int = 16
 
     # Dataset hyperparamters
-    data_name: str = "cavity_prop"
+    data_name: str = "cavity_bc_geo_prop"
     """
     One of: 'laminar_*', 'cavity_*', 'karman_*', where * is used to
     indicate the subset to use. E.g., 'laminar_prop_geo' trains
     on the subset of laminar task with varying geometry and physical
     properties.
     """
-    data_dir: str = "../data"
+    data_dir: str = "/dssg/home/acct-iclover/iclover/gnn-flow-field-mirror/data"
     """The directory that contains the CFDBench."""
     norm_props: int = 1
     """Whether to normalize the physical properties."""
@@ -96,8 +96,6 @@ class Args(Tap):
 
 
 def is_args_valid(args: Args):
-    assert any(
-        key in args.data_name for key in ["poiseuille", "cavity", "karman"]
-    )
+    assert any(key in args.data_name for key in ["poiseuille", "cavity", "karman"])
     assert args.batch_size > 0
     assert args.model in ["deeponet", "unet", "fno", "resnet"]
