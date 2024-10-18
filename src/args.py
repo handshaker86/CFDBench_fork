@@ -34,6 +34,12 @@ class Args(Tap):
     batch_size: int = 128
     eval_batch_size: int = 16
 
+    velocity_dim: int = 0
+    """
+    Choose the velocity dimension for training and evaluation. 
+    0 for u (horizontal velocity), 1 for v (vertical velocity).
+    """
+
     # Dataset hyperparamters
     data_name: str = "cavity_bc_geo_prop"
     """
