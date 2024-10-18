@@ -52,7 +52,7 @@ class Args(Tap):
     """Number of rows in the lattice that represents the field."""
     num_cols = 64
     """Number of columns in the lattice that represents the field."""
-    delta_time: float = 0.1
+    delta_time: float = 1.0
     """The time step size."""
 
     # FFN hyperparameters
