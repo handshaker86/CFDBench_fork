@@ -160,7 +160,9 @@ def plot_flow_field(u, v, color: str, label: str, ax):
     ax.set_ylabel("Y-axis")
 
 
-def generate_frame(u_real_frame, v_real_frame, u_pred_frame, v_pred_frame):
+def generate_frame(
+    u_real_frame, v_real_frame, u_pred_frame, v_pred_frame, save_path: Path
+):
     for i in range(v_real_frame.shape[0]):
         v_r = v_real_frame[i, :, :]
         u_r = u_real_frame[i, :, :]
@@ -175,7 +177,7 @@ def generate_frame(u_real_frame, v_real_frame, u_pred_frame, v_pred_frame):
 
         # Adjust layout and show the figure
         plt.tight_layout()
-        plt.show()
+        plt.savefig(save_path / f"Frame_{i+1}.png")
         plt.clf()
         plt.close()
 

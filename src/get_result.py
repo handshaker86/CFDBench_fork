@@ -88,6 +88,8 @@ def get_result(result_dir: Path, data_pattern: str, model_pattern: str):
 
 
 def get_visualize_result(labels: Tensor, velocity_path: Path):
+    print("Getting visualing result...")
+
     u_prediction_path = velocity_path / "u" / "test" / "preds.pt"
     v_prediction_path = velocity_path / "v" / "test" / "preds.pt"
 
@@ -105,7 +107,11 @@ def get_visualize_result(labels: Tensor, velocity_path: Path):
     u_real = labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = labels[:, 1]  # v_real: (all_frames, h, w)
 
-    generate_frame(u_real, v_real, u_prediction, v_prediction)
+    image_save_path = velocity_path / "prediction_frames"
+    image_save_path.mkdir(exist_ok=True, parents=True)
+    generate_frame(u_real, v_real, u_prediction, v_prediction,image_save_path)
+
+    print("Getting visualing result finished.")
 
 
 if __name__ == "__main__":
