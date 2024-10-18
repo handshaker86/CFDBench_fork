@@ -54,9 +54,9 @@ class Args(Tap):
     """Whether to normalize the physical properties."""
     norm_bc: int = 1
     """Whether to normalize the boundary conditions."""
-    num_rows = 64
+    num_rows = 16
     """Number of rows in the lattice that represents the field."""
-    num_cols = 64
+    num_cols = 16
     """Number of columns in the lattice that represents the field."""
     delta_time: float = 1.0
     """The time step size."""
@@ -67,8 +67,8 @@ class Args(Tap):
 
     # DeepONet hyperparameters
     deeponet_width: int = 100
-    branch_depth: int = 8
-    trunk_depth: int = 8
+    branch_depth: int = 2
+    trunk_depth: int = 1
     act_fn: str = "relu"
     act_scale_invariant: int = 1
     act_on_output: int = 0

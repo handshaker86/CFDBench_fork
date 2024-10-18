@@ -26,6 +26,8 @@ def load_case_data(case_dir: Path) -> Tuple[np.ndarray, Dict[str, float]]:
     v_file = case_dir / "v.npy"
     u = np.load(u_file)
     v = np.load(v_file)
+    u = u[:, ::4, ::4]
+    v = v[:, ::4, ::4]
     # The shape of u and v is (time steps, height, width)
 
     mask = np.ones_like(u)
@@ -132,9 +134,7 @@ class CavityFlowDataset(CfdDataset):
             )
             self.all_features.append(this_case_features)
             self.case_params.append(params_tensor)
-            features.append(
-                torch.tensor(this_case_features, dtype=torch.float32)
-            )
+            features.append(torch.tensor(this_case_features, dtype=torch.float32))
             case_ids.append(case_id)
             self.num_frames.append(T)
 
@@ -237,9 +237,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
     Each example is (u_{t-1} -> u_{t}), is used for auto-regressive generation.
     """
 
-    data_delta_time = (
-        0.1  # The time between two consecutive frames in the data
-    )
+    data_delta_time = 0.1  # The time between two consecutive frames in the data
 
     def __init__(
         self,
@@ -288,9 +286,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
 
         # Loop through each frame in each case, create features labels
         for case_id, case_dir in enumerate(case_dirs):
-            case_features, this_case_params = load_case_data(
-                case_dir
-            )  # (T, c, h, w)
+            case_features, this_case_params = load_case_data(case_dir)  # (T, c, h, w)
             self.all_features.append(case_features)
             inputs = case_features[:-time_step_size, :]  # (T, 3, h, w)
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
@@ -307,9 +303,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
             # Stop when converged
             for i in range(num_steps):
                 inp = torch.tensor(inputs[i], dtype=torch.float32)  # (3, h, w)
-                out = torch.tensor(
-                    outputs[i], dtype=torch.float32
-                )  # (3, h, w)
+                out = torch.tensor(outputs[i], dtype=torch.float32)  # (3, h, w)
 
                 # Check for convergence
                 inp_magn = torch.sqrt(inp[0] ** 2 + inp[1] ** 2)
@@ -317,8 +311,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
                 diff = torch.abs(inp_magn - out_magn).mean()
                 if diff < self.stable_state_diff:
                     print(
-                        f"Converged at {i} out of {num_steps},"
-                        f" {this_case_params}"
+                        f"Converged at {i} out of {num_steps}," f" {this_case_params}"
                     )
                     break
                 assert not torch.isnan(inp).any()
@@ -330,9 +323,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
         self.labels = torch.stack(all_labels)  # (# cases, 3, h, w)
         self.case_ids = np.array(all_case_ids)  # (# cases,)
 
-    def __getitem__(
-        self, idx: int
-    ) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
+    def __getitem__(self, idx: int) -> Tuple[Tensor, Tensor, Dict[str, Tensor]]:
         """
         Return:
             feat: (2, h, w)
@@ -345,8 +336,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
         case_id = self.case_ids[idx]
         case_params = self.case_params[case_id]
         case_params = {
-            k: torch.tensor(v, dtype=torch.float32)
-            for k, v in case_params.items()
+            k: torch.tensor(v, dtype=torch.float32) for k, v in case_params.items()
         }
         return inputs, label, case_params
 
@@ -385,9 +375,7 @@ def get_cavity_datasets(
     train_data = CavityFlowDataset(
         train_case_dirs, norm_props=norm_props, norm_bc=norm_bc
     )
-    dev_data = CavityFlowDataset(
-        dev_case_dirs, norm_props=norm_props, norm_bc=norm_bc
-    )
+    dev_data = CavityFlowDataset(dev_case_dirs, norm_props=norm_props, norm_bc=norm_bc)
     test_data = CavityFlowDataset(
         test_case_dirs, norm_props=norm_props, norm_bc=norm_bc
     )
@@ -405,7 +393,7 @@ def get_cavity_auto_datasets(
 ):
     print(data_dir, case_name)
     case_dirs = []
-    for name in ["bc", "geo","prop"]:
+    for name in ["bc", "geo", "prop"]:
         if name in case_name:
             case_dir = data_dir / name
             print(f"Getting cases from: {case_dir}")
