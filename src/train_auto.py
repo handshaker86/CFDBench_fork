@@ -373,7 +373,13 @@ def main():
         parent = output_dir.parent
         u_result_path = parent / "u"
         v_result_path = parent / "v"
+
+        if not u_result_path.is_dir():
+            print("[INFO] Directory containing u velocity results not found")
+        if not v_result_path.is_dir():
+            print("[INFO] Directory containing v velocity results not found")
         if u_result_path.is_dir() and v_result_path.is_dir():
+            print("[INFO] Directory containing u and v velocity results are found")
             get_visualize_result(test_data.labels, parent)
 
 

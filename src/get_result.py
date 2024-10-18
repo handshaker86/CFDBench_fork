@@ -94,11 +94,11 @@ def get_visualize_result(labels: Tensor, velocity_path: Path):
     v_prediction_path = velocity_path / "v" / "test" / "preds.pt"
 
     if not check_file_exists(u_prediction_path):
-        print("[ERROR] u prediction not found")
+        print("[ERROR] u prediction result not found")
         return
 
     if not check_file_exists(v_prediction_path):
-        print("[ERROR] v prediction not found")
+        print("[ERROR] v prediction result not found")
         return
 
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
