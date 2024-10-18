@@ -48,6 +48,10 @@ class Args(Tap):
     on the subset of laminar task with varying geometry and physical
     properties.
     """
+    data_to_visualize: str = "geo"
+    """
+    One of 'bc', 'geo', 'prop'. Used to visualize the dataset.
+    """
     data_dir: str = "/dssg/home/acct-iclover/iclover/gnn-flow-field-mirror/data"
     """The directory that contains the CFDBench."""
     norm_props: int = 1

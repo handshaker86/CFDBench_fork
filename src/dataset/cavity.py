@@ -283,14 +283,18 @@ class CavityFlowAutoDataset(CfdAutoDataset):
         all_labels: List[Tensor] = []
         all_case_ids: List[int] = []  # The case ID of each feature
         self.all_features: List[np.ndarray] = []  # (# case, # frames, 3, h, w)
+        self.case_name_list: List[str] = []  # Name of each case
+        self.frame_num_list: List[int] = []  # Number of frames in each case
 
         # Loop through each frame in each case, create features labels
         for case_id, case_dir in enumerate(case_dirs):
+            self.case_name_list.append(case_dir.name[5:])
             case_features, this_case_params = load_case_data(case_dir)  # (T, c, h, w)
             self.all_features.append(case_features)
             inputs = case_features[:-time_step_size, :]  # (T, 3, h, w)
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
+            self.frame_num_list.append(inputs.shape[0])
 
             if self.norm_props:
                 normalize_physics_props(this_case_params)

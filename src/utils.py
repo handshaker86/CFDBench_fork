@@ -161,7 +161,12 @@ def plot_flow_field(u, v, color: str, label: str, ax):
 
 
 def generate_frame(
-    u_real_frame, v_real_frame, u_pred_frame, v_pred_frame, save_path: Path
+    u_real_frame,
+    v_real_frame,
+    u_pred_frame,
+    v_pred_frame,
+    save_path: Path,
+    dir_frame_range: list[tuple],  # containing id range of frames to be visualized
 ):
     assert (
         u_real_frame.shape
@@ -170,11 +175,12 @@ def generate_frame(
         == v_pred_frame.shape
     )
 
-    for i in range(v_real_frame.shape[0]):
-        v_r = v_real_frame[i, :, :]
-        u_r = u_real_frame[i, :, :]
-        v_p = v_pred_frame[i, :, :]
-        u_p = u_pred_frame[i, :, :]
+    for start_idx, end_idx in dir_frame_range:
+        for i in range(start_idx, end_idx + 1):
+            v_r = v_real_frame[i, :, :]
+            u_r = u_real_frame[i, :, :]
+            v_p = v_pred_frame[i, :, :]
+            u_p = u_pred_frame[i, :, :]
 
         fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 

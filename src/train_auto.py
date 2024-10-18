@@ -380,7 +380,7 @@ def main():
             print("[INFO] Directory containing v velocity results not found")
         if u_result_path.is_dir() and v_result_path.is_dir():
             print("[INFO] Directory containing u and v velocity results are found")
-            get_visualize_result(test_data.labels, parent)
+            get_visualize_result(test_data, parent, args.data_to_visualize)
 
 
 if __name__ == "__main__":

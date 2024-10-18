@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from utils import load_json, check_file_exists, generate_frame
+from dataset.cavity import CavityFlowAutoDataset
 
 
 def get_dev_losses(output_dir: Path):
@@ -87,7 +88,9 @@ def get_result(result_dir: Path, data_pattern: str, model_pattern: str):
     print(*lines, sep="\n", file=open(out_path, "w", encoding="utf8"))
 
 
-def get_visualize_result(labels: Tensor, velocity_path: Path):
+def get_visualize_result(
+    test_data: CavityFlowAutoDataset, velocity_path: Path, data_to_visualize: str
+):
     print("Getting visualing result...")
 
     u_prediction_path = velocity_path / "u" / "test" / "preds.pt"
@@ -101,15 +104,31 @@ def get_visualize_result(labels: Tensor, velocity_path: Path):
         print("[ERROR] v prediction result not found")
         return
 
+    count = 0
+    dir_frame_range = []
+    frame_num_list = test_data.frame_num_list
+    name_list = test_data.name_list
+
+    for i in range(len(name_list)):
+        dir_name = name_list[i]
+        if data_to_visualize in dir_name:
+            dir_frame_range.append((count, count + frame_num_list[i] - 1))
+            count += frame_num_list[i]
+            break
+        else:
+            count += frame_num_list[i]
+
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
     v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
 
-    u_real = labels[:, 0]  # u_real: (all_frames, h, w)
-    v_real = labels[:, 1]  # v_real: (all_frames, h, w)
+    u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
+    v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
 
-    image_save_path = velocity_path / "prediction_frames"
+    image_save_path = velocity_path / "prediction_frames" / data_to_visualize
     image_save_path.mkdir(exist_ok=True, parents=True)
-    generate_frame(u_real, v_real, u_prediction, v_prediction,image_save_path)
+    generate_frame(
+        u_real, v_real, u_prediction, v_prediction, image_save_path, dir_frame_range
+    )
 
     print("Getting visualing result finished.")
 
