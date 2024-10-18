@@ -137,7 +137,7 @@ class AutoDeepONet(AutoCfdModel):
         preds += residuals
 
         if label is not None:
-            label = label[:, 0]  # (B, 1, h, w)  # Predict only u
+            label = label[:, self.velocity_dim]  # (B, 1, h, w)  # Predict only u
             labels = label[:, query_idxs[:, 0], query_idxs[:, 1]]  # (b, k)
             loss = self.loss_fn(labels=labels, preds=preds)  # (b, k)
             return dict(
