@@ -210,11 +210,6 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         args.model,
     )
     if args.model == "deeponet":
-        if args.velocity_dim == 0:
-            velocity_dim = "u"
-        else:
-            velocity_dim = "v"
-
         dir_name = (
             f"lr{args.lr}"
             + f"_width{args.deeponet_width}"
@@ -227,7 +222,6 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         )
 
         output_dir /= dir_name
-        output_dir /= velocity_dim
         return output_dir
     elif args.model == "unet":
         dir_name = (
@@ -263,6 +257,11 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         )
         return output_dir / dir_name
     elif args.model == "auto_deeponet":
+        if args.velocity_dim == 0:
+            velocity_dim = "u"
+        else:
+            velocity_dim = "v"
+
         dir_name = (
             f"lr{args.lr}"
             f"_width{args.deeponet_width}"
@@ -271,7 +270,9 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             f"_normprop{args.norm_props}"
             f"_act{args.act_fn}"
         )
-        return output_dir / dir_name
+        output_dir /= dir_name
+        output_dir /= velocity_dim
+        return output_dir
     elif args.model == "auto_ffn":
         dir_name = (
             f"lr{args.lr}" f"_width{args.autoffn_width}" f"_depth{args.autoffn_depth}"
