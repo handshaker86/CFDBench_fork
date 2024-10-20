@@ -45,11 +45,9 @@ class Args(Tap):
     """
     One of 'bc', 'geo', 'prop'. Used to visualize the dataset.
     """
-    cal_case_accuracy: bool = False
+    cal_case_accuracy: bool = True
     """Whether to calculate the case accuracy."""
-    cal_global_accuracy: bool = False
-    """Whether to calculate the global accuracy."""
-    
+
     # Dataset hyperparamters
     data_name: str = "cavity_bc_geo_prop"
     """

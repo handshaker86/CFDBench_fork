@@ -5,6 +5,7 @@ import numpy as np
 import torch
 
 from utils import load_json, check_file_exists, generate_frame
+from utils_auto import get_frame_accuracy
 from dataset.cavity import CavityFlowAutoDataset
 
 
@@ -120,17 +121,65 @@ def get_visualize_result(
 
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
     v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+    assert u_prediction.shape == v_prediction.shape
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
+    assert u_real.shape == v_real.shape
 
-    image_save_path = velocity_path / "prediction_frames" / data_to_visualize
+    image_save_path = velocity_path / "visualize_result" / data_to_visualize
     image_save_path.mkdir(exist_ok=True, parents=True)
     generate_frame(
         u_real, v_real, u_prediction, v_prediction, image_save_path, dir_frame_range
     )
 
     print("Getting visualing result finished.")
+
+
+def get_case_accuracy(
+    test_data: CavityFlowAutoDataset,
+    prediction_path: Path,
+):
+    u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
+    v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+    accuracy_save_path = prediction_path / "accuracy_result"
+    accuracy_save_path.mkdir(exist_ok=True, parents=True)
+
+    u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
+    v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+    assert u_prediction.shape == v_prediction.shape
+
+    u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
+    v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
+    assert u_real.shape == v_real.shape
+
+    name_list = test_data.name_list
+    frame_num_list = test_data.frame_num_list
+
+    count = 0
+    accuracy_list = []  # store the accuracy for each frame in one case
+    case_accuracy_list = []  # store the accuracy for each case
+
+    for i in range(u_prediction.shape[0]):
+        u_p_frame = u_prediction[i, :, :]
+        v_p_frame = v_prediction[i, :, :]
+        u_r_frame = u_real[i, :, :]
+        v_r_frame = v_real[i, :, :]
+        accuracy = get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame)
+        accuracy_list.append(accuracy)
+
+        if len(accuracy_list) == frame_num_list[count]:
+            case_accuracy = np.mean(accuracy_list)
+            case_accuracy_list.append(case_accuracy)
+            count += 1
+            accuracy_list = []
+
+    with open(accuracy_save_path / "case_accuracy.txt", "w") as f:
+        for i in range(len(case_accuracy_list)):
+            assert len(name_list) == len(case_accuracy_list)
+            f.write(f"{name_list[i]}: {case_accuracy_list[i]}\n")
+
+        f.write(f"Average case accuracy: {np.mean(case_accuracy_list)}\n")
 
 
 if __name__ == "__main__":

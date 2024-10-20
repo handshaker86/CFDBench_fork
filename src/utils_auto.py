@@ -1,5 +1,6 @@
-from typing import Tuple
+import numpy as np
 
+from typing import Tuple
 from models.resnet import ResNet
 from models.unet import UNet
 from models.base_model import AutoCfdModel
@@ -122,3 +123,24 @@ def init_model(args: Args) -> AutoCfdModel:
         return model
     else:
         raise ValueError(f"Invalid model name: {args.model}")
+
+
+def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
+    # Calculate the prediction accuracy for one frame
+    vel_p = np.sqrt(u_p_frame**2 + v_p_frame**2)
+    vel_r = np.sqrt(u_r_frame**2 + v_r_frame**2)
+    angle_p = np.arctan2(v_p_frame, u_p_frame)
+    angle_r = np.arctan2(v_r_frame, u_r_frame)
+
+    delta_angle = angle_p - angle_r
+
+    SI = np.cos(delta_angle)
+    mask_1 = SI > 0.8
+
+    MI = 1 - abs(vel_p - vel_r) / (vel_r + vel_p)
+    mask_2 = MI > 0.8
+
+    mask = mask_1 * mask_2
+    good_pred_rate = np.sum(mask) / mask.size
+
+    return good_pred_rate

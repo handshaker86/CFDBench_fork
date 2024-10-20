@@ -386,10 +386,8 @@ def main():
 
         # Calculate prediction accuracy
         if args.cal_case_accuracy:
-            get_case_accuracy()
-
-        if args.cal_global_accuracy:
-            get_global_accuracy()
+            parent = output_dir.parent
+            get_case_accuracy(test_data, parent)
 
 
 if __name__ == "__main__":
