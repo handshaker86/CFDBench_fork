@@ -39,7 +39,17 @@ class Args(Tap):
     Choose the velocity dimension for training and evaluation. 
     0 for u (horizontal velocity), 1 for v (vertical velocity).
     """
-
+    visualize: bool = True
+    """Whether to visualize the dataset."""
+    data_to_visualize: str = "geo"
+    """
+    One of 'bc', 'geo', 'prop'. Used to visualize the dataset.
+    """
+    cal_case_accuracy: bool = False
+    """Whether to calculate the case accuracy."""
+    cal_global_accuracy: bool = False
+    """Whether to calculate the global accuracy."""
+    
     # Dataset hyperparamters
     data_name: str = "cavity_bc_geo_prop"
     """
@@ -47,10 +57,6 @@ class Args(Tap):
     indicate the subset to use. E.g., 'laminar_prop_geo' trains
     on the subset of laminar task with varying geometry and physical
     properties.
-    """
-    data_to_visualize: str = "geo"
-    """
-    One of 'bc', 'geo', 'prop'. Used to visualize the dataset.
     """
     data_dir: str = "/dssg/home/acct-iclover/iclover/gnn-flow-field-mirror/data"
     """The directory that contains the CFDBench."""

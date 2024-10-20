@@ -29,7 +29,7 @@ from utils import (
 )
 from utils_auto import init_model
 from args import Args
-from get_result import get_visualize_result
+from get_result import get_visualize_result, get_case_accuracy, get_global_accuracy
 
 
 def collate_fn(batch: list):
@@ -370,17 +370,26 @@ def main():
             plot_interval=10,
         )
 
-        parent = output_dir.parent
-        u_result_path = parent / "u"
-        v_result_path = parent / "v"
+        # Visualize prediction
+        if args.visualize:
+            parent = output_dir.parent
+            u_result_path = parent / "u"
+            v_result_path = parent / "v"
 
-        if not u_result_path.is_dir():
-            print("[INFO] Directory containing u velocity results not found")
-        if not v_result_path.is_dir():
-            print("[INFO] Directory containing v velocity results not found")
-        if u_result_path.is_dir() and v_result_path.is_dir():
-            print("[INFO] Directory containing u and v velocity results are found")
-            get_visualize_result(test_data, parent, args.data_to_visualize)
+            if not u_result_path.is_dir():
+                print("[INFO] Directory containing u velocity results not found")
+            if not v_result_path.is_dir():
+                print("[INFO] Directory containing v velocity results not found")
+            if u_result_path.is_dir() and v_result_path.is_dir():
+                print("[INFO] Directory containing u and v velocity results are found")
+                get_visualize_result(test_data, parent, args.data_to_visualize)
+
+        # Calculate prediction accuracy
+        if args.cal_case_accuracy:
+            get_case_accuracy()
+
+        if args.cal_global_accuracy:
+            get_global_accuracy()
 
 
 if __name__ == "__main__":
