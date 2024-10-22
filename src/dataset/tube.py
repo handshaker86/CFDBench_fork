@@ -39,15 +39,11 @@ def load_case_data(case_dir: Path) -> Tuple[np.ndarray, Dict[str, float]]:
         constant_values=case_params["vel_in"],
     )
     v = np.pad(v, ((0, 0), (0, 0), (1, 0)), mode="constant", constant_values=0)
-    mask = np.pad(
-        mask, ((0, 0), (0, 0), (1, 0)), mode="constant", constant_values=0
-    )
+    mask = np.pad(mask, ((0, 0), (0, 0), (1, 0)), mode="constant", constant_values=0)
     # # Pad the top and bottom
     u = np.pad(u, ((0, 0), (1, 1), (0, 0)), mode="constant", constant_values=0)
     v = np.pad(v, ((0, 0), (1, 1), (0, 0)), mode="constant", constant_values=0)
-    mask = np.pad(
-        mask, ((0, 0), (1, 1), (0, 0)), mode="constant", constant_values=0
-    )
+    mask = np.pad(mask, ((0, 0), (1, 1), (0, 0)), mode="constant", constant_values=0)
     features = np.stack([u, v, mask], axis=1)  # (T, 3, h, w)
     return features, case_params
 
@@ -60,9 +56,7 @@ class TubeFlowDataset(CfdDataset):
     (3 variables).
     """
 
-    data_delta_time = (
-        0.1  # Time difference (s) between two frames in the data.
-    )
+    data_delta_time = 0.1  # Time difference (s) between two frames in the data.
     data_max_time = 30  # Total time (s) in the data.
     case_params_keys = ["vel_in", "density", "viscosity", "height", "width"]
 
@@ -105,9 +99,7 @@ class TubeFlowDataset(CfdDataset):
         self.num_features = 0
         self.num_frames: List[int] = []
         features: List[Tensor] = []
-        case_ids: List[int] = []  # 每个样本对应的case的id
-
-        # 遍历每个case的每一帧，构造features和labels
+        case_ids: List[int] = []
         for case_id, case_dir in enumerate(tqdm(case_dirs)):
             # (T, c, h, w), dict
             this_case_features, this_case_params = load_case_data(case_dir)
@@ -123,9 +115,7 @@ class TubeFlowDataset(CfdDataset):
                 dtype=torch.float32,
             )
             self.case_params.append(params_tensor)
-            features.append(
-                torch.tensor(this_case_features, dtype=torch.float32)
-            )
+            features.append(torch.tensor(this_case_features, dtype=torch.float32))
             case_ids.append(case_id)
             self.num_frames.append(T)
 
@@ -179,9 +169,7 @@ class TubeFlowAutoDataset(CfdAutoDataset):
     variables).
     """
 
-    data_delta_time = (
-        0.1  # Time difference (s) between two frames in the data.
-    )
+    data_delta_time = 0.1  # Time difference (s) between two frames in the data.
     data_max_time = 30  # Total time (s) in the data.
 
     def __init__(
@@ -230,7 +218,7 @@ class TubeFlowAutoDataset(CfdAutoDataset):
             self.labels: List[Tensor]  # (2, h, w)
             self.case_ids: List[int]  # Each sample's case ID
         """
-        # 根据 case ID 来排序 case 子目录
+
         self.case_params: List[dict] = []
         all_inputs: List[Tensor] = []
         all_labels: List[Tensor] = []
@@ -239,9 +227,7 @@ class TubeFlowAutoDataset(CfdAutoDataset):
 
         # loop all cases
         for case_id, case_dir in enumerate(case_dirs):
-            case_features, this_case_params = load_case_data(
-                case_dir
-            )  # (T, c, h, w)
+            case_features, this_case_params = load_case_data(case_dir)  # (T, c, h, w)
             inputs = case_features[:-time_step_size, :]  # (T, 3, h, w)
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             self.all_features.append(case_features)
@@ -267,8 +253,7 @@ class TubeFlowAutoDataset(CfdAutoDataset):
                 # print(f"Mean difference: {diff}")
                 if diff < self.stable_state_diff:
                     print(
-                        f"Converged at {i} out of {num_steps},"
-                        f" {this_case_params}"
+                        f"Converged at {i} out of {num_steps}," f" {this_case_params}"
                     )
                     break
                 assert not torch.isnan(inp).any()
@@ -286,8 +271,7 @@ class TubeFlowAutoDataset(CfdAutoDataset):
         case_id = self.case_ids[idx]
         case_params = self.case_params[case_id]
         case_params = {
-            k: torch.tensor(v, dtype=torch.float32)
-            for k, v in case_params.items()
+            k: torch.tensor(v, dtype=torch.float32) for k, v in case_params.items()
         }
         return inputs, label, case_params
 
@@ -326,12 +310,8 @@ def get_tube_datasets(
     train_data = TubeFlowDataset(
         train_case_dirs, norm_props=norm_props, norm_bc=norm_bc
     )
-    dev_data = TubeFlowDataset(
-        dev_case_dirs, norm_props=norm_props, norm_bc=norm_bc
-    )
-    test_data = TubeFlowDataset(
-        test_case_dirs, norm_props=norm_props, norm_bc=norm_bc
-    )
+    dev_data = TubeFlowDataset(dev_case_dirs, norm_props=norm_props, norm_bc=norm_bc)
+    test_data = TubeFlowDataset(test_case_dirs, norm_props=norm_props, norm_bc=norm_bc)
     return train_data, dev_data, test_data
 
 
