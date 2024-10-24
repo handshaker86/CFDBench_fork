@@ -108,16 +108,17 @@ def get_visualize_result(
     count = 0
     dir_frame_range = []
     frame_num_list = test_data.frame_num_list
-    name_list = test_data.name_list
+    name_list = test_data.case_name_list
 
     for i in range(len(name_list)):
         dir_name = name_list[i]
         if data_to_visualize in dir_name:
             dir_frame_range.append((count, count + frame_num_list[i] - 1))
             count += frame_num_list[i]
-            break
         else:
             count += frame_num_list[i]
+
+    
 
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
     v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
@@ -153,7 +154,7 @@ def get_case_accuracy(
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
     assert u_real.shape == v_real.shape
 
-    name_list = test_data.name_list
+    name_list = test_data.case_name_list
     frame_num_list = test_data.frame_num_list
 
     count = 0
@@ -175,8 +176,8 @@ def get_case_accuracy(
             accuracy_list = []
 
     with open(accuracy_save_path / "case_accuracy.txt", "w") as f:
+        assert len(name_list) == len(case_accuracy_list)
         for i in range(len(case_accuracy_list)):
-            assert len(name_list) == len(case_accuracy_list)
             f.write(f"{name_list[i]}: {case_accuracy_list[i]}\n")
 
         f.write(f"Average case accuracy: {np.mean(case_accuracy_list)}\n")
