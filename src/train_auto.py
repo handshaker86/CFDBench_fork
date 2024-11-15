@@ -356,6 +356,7 @@ def main():
             log_interval=args.log_interval,
         )
     if "test" in args.mode:
+        start_time = time.time()
         args.save(str(output_dir / "test_args.json"))
         # Test
         load_best_ckpt(model, output_dir)
@@ -369,6 +370,11 @@ def main():
             infer_steps=20,
             plot_interval=10,
         )
+        end_time = time.time()
+        total_time = end_time - start_time
+
+        with (open("time.txt",'w')) as f:
+            f.write (f"Time taken for generating single prediction: {total_time}")
 
     # Visualize prediction
     if args.visualize:
