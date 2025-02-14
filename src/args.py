@@ -39,13 +39,13 @@ class Args(Tap):
     Choose the velocity dimension for training and evaluation. 
     0 for u (horizontal velocity), 1 for v (vertical velocity).
     """
-    visualize: bool = True
+    visualize: bool = False
     """Whether to visualize the dataset."""
     data_to_visualize: str = "geo"
     """
     One of 'bc', 'geo', 'prop'. Used to visualize the dataset.
     """
-    cal_case_accuracy: bool = True
+    cal_case_accuracy: bool = False
     """Whether to calculate the case accuracy."""
 
     # Dataset hyperparamters
@@ -62,9 +62,9 @@ class Args(Tap):
     """Whether to normalize the physical properties."""
     norm_bc: int = 1
     """Whether to normalize the boundary conditions."""
-    num_rows = 16
+    num_rows = 64
     """Number of rows in the lattice that represents the field."""
-    num_cols = 16
+    num_cols = 64
     """Number of columns in the lattice that represents the field."""
     delta_time: float = 1.0
     """The time step size."""
