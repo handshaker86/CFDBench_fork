@@ -127,6 +127,11 @@ def init_model(args: Args) -> AutoCfdModel:
 
 def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
     # Calculate the prediction accuracy for one frame
+    u_p_frame = u_p_frame.numpy()
+    v_p_frame = v_p_frame.numpy()
+    u_r_frame = u_r_frame.numpy()
+    v_r_frame = v_r_frame.numpy()
+
     vel_p = np.sqrt(u_p_frame**2 + v_p_frame**2)
     vel_r = np.sqrt(u_r_frame**2 + v_r_frame**2)
     angle_p = np.arctan2(v_p_frame, u_p_frame)

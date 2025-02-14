@@ -182,17 +182,17 @@ def generate_frame(
             v_p = v_pred_frame[i, :, :]
             u_p = u_pred_frame[i, :, :]
 
-        fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+            fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
-        plot_flow_field(u_r, v_r, "g", f"Real Field - Frame {i+1}", axs[0])
+            plot_flow_field(u_r, v_r, "g", f"Real Field - Frame {i+1}", axs[0])
 
-        plot_flow_field(u_p, v_p, "g", f"Predicted Field - Frame {i+1}", axs[1])
+            plot_flow_field(u_p, v_p, "g", f"Predicted Field - Frame {i+1}", axs[1])
 
-        # Adjust layout and show the figure
-        plt.tight_layout()
-        plt.savefig(save_path / f"Frame_{i+1}.png")
-        plt.clf()
-        plt.close()
+            # Adjust layout and show the figure
+            plt.tight_layout()
+            plt.savefig(save_path / f"Frame_{i+1}.png")
+            plt.clf()
+            plt.close()
 
 
 def get_best_ckpt(output_dir: Path) -> Union[Path, None]:

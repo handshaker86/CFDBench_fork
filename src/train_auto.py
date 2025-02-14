@@ -29,7 +29,7 @@ from utils import (
 )
 from utils_auto import init_model
 from args import Args
-from get_result import get_visualize_result, get_case_accuracy, get_global_accuracy
+from get_result import get_visualize_result, get_case_accuracy
 
 
 def collate_fn(batch: list):
@@ -356,6 +356,7 @@ def main():
             log_interval=args.log_interval,
         )
     if "test" in args.mode:
+        start_time = time.time()
         args.save(str(output_dir / "test_args.json"))
         # Test
         load_best_ckpt(model, output_dir)
@@ -369,25 +370,30 @@ def main():
             infer_steps=20,
             plot_interval=10,
         )
+        end_time = time.time()
+        total_time = end_time - start_time
 
-        # Visualize prediction
-        if args.visualize:
-            parent = output_dir.parent
-            u_result_path = parent / "u"
-            v_result_path = parent / "v"
+        with (open("time.txt",'w')) as f:
+            f.write (f"Time taken for generating single prediction: {total_time}")
 
-            if not u_result_path.is_dir():
-                print("[INFO] Directory containing u velocity results not found")
-            if not v_result_path.is_dir():
-                print("[INFO] Directory containing v velocity results not found")
-            if u_result_path.is_dir() and v_result_path.is_dir():
-                print("[INFO] Directory containing u and v velocity results are found")
-                get_visualize_result(test_data, parent, args.data_to_visualize)
+    # Visualize prediction
+    if args.visualize:
+        parent = output_dir.parent
+        u_result_path = parent / "u"
+        v_result_path = parent / "v"
 
-        # Calculate prediction accuracy
-        if args.cal_case_accuracy:
-            parent = output_dir.parent
-            get_case_accuracy(test_data, parent)
+        if not u_result_path.is_dir():
+            print("[INFO] Directory containing u velocity results not found")
+        if not v_result_path.is_dir():
+            print("[INFO] Directory containing v velocity results not found")
+        if u_result_path.is_dir() and v_result_path.is_dir():
+            print("[INFO] Directory containing u and v velocity results are found")
+            get_visualize_result(test_data, parent, args.data_to_visualize)
+
+    # Calculate prediction accuracy
+    if args.cal_case_accuracy:
+        parent = output_dir.parent
+        get_case_accuracy(test_data, parent)
 
 
 if __name__ == "__main__":
