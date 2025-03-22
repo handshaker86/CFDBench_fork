@@ -26,8 +26,6 @@ def load_case_data(case_dir: Path) -> Tuple[np.ndarray, Dict[str, float]]:
     v_file = case_dir / "v.npy"
     u = np.load(u_file)
     v = np.load(v_file)
-    u = u[:, ::4, ::4]
-    v = v[:, ::4, ::4]
     # The shape of u and v is (time steps, height, width)
 
     mask = np.ones_like(u)
