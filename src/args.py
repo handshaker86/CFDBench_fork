@@ -66,6 +66,7 @@ class Args(Tap):
     """Number of rows in the lattice that represents the field."""
     num_cols = 64
     """Number of columns in the lattice that represents the field."""
+    # The time interval between two time step is 0.1s
     delta_time: float = 1.0
     """The time step size."""
 
