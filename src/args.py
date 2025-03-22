@@ -45,7 +45,7 @@ class Args(Tap):
     """
     One of 'bc', 'geo', 'prop'. Used to visualize the dataset.
     """
-    cal_case_accuracy: bool = False
+    cal_case_accuracy: bool = True
     """Whether to calculate the case accuracy."""
 
     # Dataset hyperparamters
@@ -56,7 +56,7 @@ class Args(Tap):
     on the subset of laminar task with varying geometry and physical
     properties.
     """
-    data_dir: str = "/dssg/home/acct-iclover/iclover/gnn-flow-field-mirror/data"
+    data_dir: str = "/dssg/home/acct-iclover/iclover/cfdbench_dataset"
     """The directory that contains the CFDBench."""
     norm_props: int = 1
     """Whether to normalize the physical properties."""

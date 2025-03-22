@@ -64,7 +64,7 @@ def evaluate(
     output_dir: Path,
     batch_size: int = 2,
     plot_interval: int = 1,
-    measure_time: bool = False,
+    measure_time: bool = True,
 ):
     if measure_time:
         assert batch_size == 1
@@ -120,11 +120,16 @@ def evaluate(
                 )
 
     if measure_time:
+        end_time = time.time()
+        with open(output_dir / "predict_time.txt", "w") as f:
+            f.write(f"Time taken for generating prediction: {end_time - start_time}")
+
         print("Memory usage:")
         print(torch.cuda.memory_summary("cuda"))
         print("Time usage:")
-        time_per_step = 1000 * (time.time() - start_time) / len(loader)
+        time_per_step = 1000 * (end_time - start_time) / len(loader)
         print(f"Time (ms) per step: {time_per_step:.3f}")
+        print(f"Predict has been saved to {output_dir/'predict_time.txt'}")
         exit()
 
     avg_scores = {}
@@ -153,7 +158,7 @@ def test(
     infer_steps: int = 200,
     plot_interval: int = 10,
     batch_size: int = 1,
-    measure_time: bool = False,
+    measure_time: bool = True,
 ):
     assert infer_steps > 0
     assert plot_interval > 0
@@ -356,7 +361,6 @@ def main():
             log_interval=args.log_interval,
         )
     if "test" in args.mode:
-        start_time = time.time()
         args.save(str(output_dir / "test_args.json"))
         # Test
         load_best_ckpt(model, output_dir)
@@ -370,11 +374,6 @@ def main():
             infer_steps=20,
             plot_interval=10,
         )
-        end_time = time.time()
-        total_time = end_time - start_time
-
-        with (open("time.txt",'w')) as f:
-            f.write (f"Time taken for generating single prediction: {total_time}")
 
     # Visualize prediction
     if args.visualize:
