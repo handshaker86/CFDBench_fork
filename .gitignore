@@ -3,3 +3,6 @@ __pycache__
 images
 data
 .DS_Store
+*.png
+*.pt
+result/
