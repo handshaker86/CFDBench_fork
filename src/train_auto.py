@@ -64,7 +64,7 @@ def evaluate(
     output_dir: Path,
     batch_size: int = 2,
     plot_interval: int = 1,
-    measure_time: bool = True,
+    measure_time: bool = False,
 ):
     if measure_time:
         assert batch_size == 1
@@ -118,18 +118,17 @@ def evaluate(
                     out_dir=image_dir,
                     step=step,
                 )
+    end_time = time.time()
+    with open(output_dir / "predict_time.txt", "w") as f:
+        f.write(f"Time taken for generating prediction: {end_time - start_time}")
+    print(f"Predict has been saved to {output_dir/'predict_time.txt'}")
 
     if measure_time:
-        end_time = time.time()
-        with open(output_dir / "predict_time.txt", "w") as f:
-            f.write(f"Time taken for generating prediction: {end_time - start_time}")
-
         print("Memory usage:")
         print(torch.cuda.memory_summary("cuda"))
         print("Time usage:")
         time_per_step = 1000 * (end_time - start_time) / len(loader)
         print(f"Time (ms) per step: {time_per_step:.3f}")
-        print(f"Predict has been saved to {output_dir/'predict_time.txt'}")
         exit()
 
     avg_scores = {}
@@ -158,7 +157,7 @@ def test(
     infer_steps: int = 200,
     plot_interval: int = 10,
     batch_size: int = 1,
-    measure_time: bool = True,
+    measure_time: bool = False,
 ):
     assert infer_steps > 0
     assert plot_interval > 0
@@ -208,6 +207,7 @@ def train(
     - log_interval: log loss, learning rate etc. every `log_interval` steps.
     - measure_time: if `True`, will only run one epoch and print the time.
     """
+    train_start_time = time.time()
     train_loader = DataLoader(
         train_data, batch_size=batch_size, shuffle=True, collate_fn=collate_fn
     )
@@ -307,6 +307,10 @@ def train(
                 time=time.time() - ep_start_time,
             )
             dump_json(ep_scores, ckpt_dir / "scores.json")
+    train_end_time = time.time()
+    with open(output_dir / "train_time.txt", "w") as f:
+        f.write(f"Time taken for training: {train_end_time - train_start_time}")
+    print(f"Training time has been saved to {output_dir/'train_time.txt'}")
     print("====== Training done ======")
     dump_json(train_losses, output_dir / "train_losses.json")
     plot_loss(train_losses, output_dir / "train_losses.png")
