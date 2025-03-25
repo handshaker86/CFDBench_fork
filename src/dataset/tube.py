@@ -224,6 +224,8 @@ class TubeFlowAutoDataset(CfdAutoDataset):
         all_labels: List[Tensor] = []
         all_case_ids: List[int] = []
         self.all_features: List[np.ndarray] = []
+        self.case_name_list: List[str] = []  # Name of each case
+        self.frame_num_list: List[int] = []  # Number of frames in each case
 
         # loop all cases
         for case_id, case_dir in enumerate(case_dirs):
@@ -233,15 +235,22 @@ class TubeFlowAutoDataset(CfdAutoDataset):
             self.all_features.append(case_features)
             assert len(inputs) == len(outputs)
 
+            num_steps = len(outputs)
+            if num_steps <= 0:
+                continue
+
             if self.norm_props:
                 normalize_physics_props(this_case_params)
             if self.norm_bc:
                 normalize_bc(this_case_params, "vel_in")
 
+            self.case_name_list.append(case_dir.parent.name + case_dir.name[5:])
+            self.frame_num_list.append(num_steps)
             self.case_params.append(this_case_params)
-            num_steps = len(outputs)
             # Loop frames, get input-output pairs
             # Stop when converged
+
+            early_converged = False
             for i in range(num_steps):
                 inp = torch.tensor(inputs[i], dtype=torch.float32)  # (2, h, w)
                 out = torch.tensor(outputs[i], dtype=torch.float32)
@@ -255,12 +264,17 @@ class TubeFlowAutoDataset(CfdAutoDataset):
                     print(
                         f"Converged at {i} out of {num_steps}," f" {this_case_params}"
                     )
+                    early_converged = True
                     break
                 assert not torch.isnan(inp).any()
                 assert not torch.isnan(out).any()
                 all_inputs.append(inp)
                 all_labels.append(out)
                 all_case_ids.append(case_id)
+            if not early_converged:
+                self.frame_num_list.append(num_steps)
+            else:
+                self.frame_num_list.append(i)
         self.inputs = torch.stack(all_inputs)  # (num_samples, 3, h, w)
         self.labels = torch.stack(all_labels)  # (num_samples, 1, h, w)
         self.case_ids = all_case_ids

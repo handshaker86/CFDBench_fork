@@ -292,18 +292,22 @@ class CavityFlowAutoDataset(CfdAutoDataset):
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
 
+            num_steps = len(outputs)
+            if num_steps <= 0:
+                continue
+
             if self.norm_props:
                 normalize_physics_props(this_case_params)
             if self.norm_bc:
                 normalize_bc(this_case_params, "vel_top")
 
+            self.case_name_list.append(case_dir.parent.name + case_dir.name[5:])
+            self.frame_num_list.append(num_steps)
             self.case_params.append(this_case_params)
-            num_steps = len(outputs)
-            if num_steps > 0:
-                self.case_name_list.append(case_dir.parent.name + case_dir.name[5:])
-                self.frame_num_list.append(num_steps)
             # Loop frames, get input-output pairs
             # Stop when converged
+
+            early_converged = False
             for i in range(num_steps):
                 inp = torch.tensor(inputs[i], dtype=torch.float32)  # (3, h, w)
                 out = torch.tensor(outputs[i], dtype=torch.float32)  # (3, h, w)
@@ -316,12 +320,18 @@ class CavityFlowAutoDataset(CfdAutoDataset):
                     print(
                         f"Converged at {i} out of {num_steps}," f" {this_case_params}"
                     )
+                    early_converged = True
                     break
                 assert not torch.isnan(inp).any()
                 assert not torch.isnan(out).any()
                 all_inputs.append(inp)  # (3, h, w)
                 all_labels.append(out)  # (3, h, w)
                 all_case_ids.append(case_id)
+            if not early_converged:
+                self.frame_num_list.append(num_steps)
+            else:
+                self.frame_num_list.append(i)
+
         self.inputs = torch.stack(all_inputs)  # (# cases, 3, h, w)
         self.labels = torch.stack(all_labels)  # (# cases, 3, h, w)
         self.case_ids = np.array(all_case_ids)  # (# cases,)

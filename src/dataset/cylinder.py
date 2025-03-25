@@ -275,6 +275,8 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
         all_labels: List[Tensor] = []
         all_case_ids: List[int] = []  # The case ID of each example
         self.all_features: List[np.ndarray] = []
+        self.case_name_list: List[str] = []  # Name of each case
+        self.frame_num_list: List[int] = []  # Number of frames in each case
 
         # Loop cases to create features and labels
         for case_id, case_dir in enumerate(case_dirs):
@@ -284,15 +286,22 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
 
+            num_steps = len(outputs)
+            if num_steps <= 0:
+                continue
+
             if self.norm_props:
                 normalize_physics_props(this_case_params)
             if self.norm_bc:
                 normalize_bc(this_case_params, "vel_in")
 
+            self.case_name_list.append(case_dir.parent.name + case_dir.name[5:])
+            self.frame_num_list.append(num_steps)
             self.case_params.append(this_case_params)
-            num_steps = len(outputs)
             # Loop frames, get input-output pairs
             # Stop when converged
+
+            early_converged = False
             for i in range(num_steps):
                 inp = torch.tensor(inputs[i], dtype=torch.float32)  # (2, h, w)
                 out = torch.tensor(outputs[i], dtype=torch.float32)
@@ -304,12 +313,17 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
                 # print(f"Mean difference: {diff}")
                 if diff < self.stable_state_diff:
                     print(f"Converged at {i} / {num_steps}, {this_case_params}")
+                    early_converged = True
                     break
                 assert not torch.isnan(inp).any()
                 assert not torch.isnan(out).any()
                 all_inputs.append(inp)
                 all_labels.append(out)
                 all_case_ids.append(case_id)
+            if not early_converged:
+                self.frame_num_list.append(num_steps)
+            else:
+                self.frame_num_list.append(i)
 
         self.inputs = torch.stack(all_inputs)  # (num_samples, 3, h, w)
         self.labels = torch.stack(all_labels)  # (num_samples, 1, h, w)

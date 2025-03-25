@@ -268,6 +268,8 @@ class DamFlowAutoDataset(CfdAutoDataset):
         all_labels: List[Tensor] = []
         all_case_ids: List[int] = []
         self.all_features: List[np.ndarray] = []
+        self.case_name_list: List[str] = []  # Name of each case
+        self.frame_num_list: List[int] = []  # Number of frames in each case
 
         for case_id, case_dir in enumerate(case_dirs):
             case_features, this_case_params = load_case_data(case_dir)  # (T, c, h, w)
@@ -276,15 +278,21 @@ class DamFlowAutoDataset(CfdAutoDataset):
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
 
+            num_steps = len(outputs)
+            if num_steps <= 0:
+                continue
+
             if self.norm_props:
                 normalize_physics_props(this_case_params)
             if self.norm_bc:
                 normalize_bc(this_case_params, "velocity")
 
+            self.case_name_list.append(case_dir.parent.name + case_dir.name[5:])
+            self.frame_num_list.append(num_steps)
             self.case_params.append(this_case_params)
-            num_steps = len(outputs)
             # Loop frames, get input-output pairs
             # Stop when converged
+
             for i in range(num_steps):
                 inp = torch.tensor(inputs[i], dtype=torch.float32)  # (2, h, w)
                 out = torch.tensor(outputs[i], dtype=torch.float32)
