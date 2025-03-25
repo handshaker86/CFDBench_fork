@@ -135,26 +135,21 @@ def get_visualize_result(
 
 def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
     # Calculate the prediction accuracy for one frame
-    u_p_frame = u_p_frame.numpy()
-    v_p_frame = v_p_frame.numpy()
-    u_r_frame = u_r_frame.numpy()
-    v_r_frame = v_r_frame.numpy()
-
-    vel_p = np.sqrt(u_p_frame**2 + v_p_frame**2)
-    vel_r = np.sqrt(u_r_frame**2 + v_r_frame**2)
-    angle_p = np.arctan2(v_p_frame, u_p_frame)
-    angle_r = np.arctan2(v_r_frame, u_r_frame)
+    vel_p = torch.sqrt(u_p_frame**2 + v_p_frame**2)
+    vel_r = torch.sqrt(u_r_frame**2 + v_r_frame**2)
+    angle_p = torch.arctan2(v_p_frame, u_p_frame)
+    angle_r = torch.arctan2(v_r_frame, u_r_frame)
 
     delta_angle = angle_p - angle_r
 
-    SI = np.cos(delta_angle)
+    SI = torch.cos(delta_angle)
     mask_1 = SI > 0.8
 
     MI = 1 - abs(vel_p - vel_r) / (vel_r + vel_p)
     mask_2 = MI > 0.8
 
     mask = mask_1 * mask_2
-    good_pred_rate = np.sum(mask) / mask.size
+    good_pred_rate = torch.sum(mask) / mask.size
 
     return good_pred_rate
 
@@ -203,6 +198,56 @@ def get_case_accuracy(
             f.write(f"{name_list[i]}: {case_accuracy_list[i]}\n")
 
         f.write(f"Average case accuracy: {np.mean(case_accuracy_list)}\n")
+
+
+def calculate_metrics(y_true, y_pred):
+    """
+    y_true: Tensor of shape (n, c, h, w), true values
+    y_pred: Tensor of shape (n, c, h, w), predicted values
+    """
+    # RMSE (Root Mean Squared Error) over all dimensions
+    rmse_mat = torch.sqrt(torch.mean((y_true - y_pred) ** 2, axis=(-1, -2)))
+    rmse = torch.mean(rmse_mat)
+
+    # Normalized RMSE (nRMSE)
+    range_y = torch.max(y_true, axis=(-1, -2)) - torch.min(y_true, axis=(-1, -2))
+    mean_y = torch.mean(y_true, axis=(-1, -2))
+    nrmse_range = torch.mean(rmse_mat / range_y)
+    nrmse_mean = torch.mean(rmse_mat / mean_y)
+
+    # Maximum Error
+    max_err_mat = torch.max(torch.abs(y_true - y_pred), axis=(-1, -2))
+    max_error = torch.mean(max_err_mat)
+
+    return {
+        "RMSE": rmse,
+        "nRMSE (range)": nrmse_range,
+        "nRMSE (mean)": nrmse_mean,
+        "Max Error": max_error,
+    }
+
+
+def cal_loss(test_data: CavityFlowAutoDataset, prediction_path: Path):
+    u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
+    v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+    loss_save_path = prediction_path / "loss_result"
+    loss_save_path.mkdir(exist_ok=True, parents=True)
+
+    u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
+    v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+    assert u_prediction.shape == v_prediction.shape
+
+    u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
+    v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
+    assert u_real.shape == v_real.shape
+
+    prediction = torch.stack([u_prediction, v_prediction], dim=1)
+    real = torch.stack([u_real, v_real], dim=1)
+
+    loss = calculate_metrics(real, prediction)
+    with open(loss_save_path / "loss.txt", "w") as f:
+        for key, value in loss.items():
+            f.write(f"{key}: {value}\n")
 
 
 if __name__ == "__main__":
