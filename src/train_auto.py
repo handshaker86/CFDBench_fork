@@ -25,7 +25,7 @@ from utils import (
     get_output_dir,
     load_best_ckpt,
     plot_predictions,
-    get_dir_nums,
+    check_file_exists,
 )
 from utils_auto import init_model
 from args import Args
@@ -379,24 +379,35 @@ def main():
             plot_interval=10,
         )
 
+    # Calculate prediction accuracy
+    if args.cal_case_accuracy:
+        parent = output_dir.parent
+        u_result_path = parent / "u"
+        v_result_path = parent / "v"
+
+        if not check_file_exists(u_result_path):
+            print(f"[Warning] u velocity results in {parent} not found")
+            raise FileNotFoundError
+        elif not check_file_exists(v_result_path):
+            print(f"[Warning] v velocity results in {parent} not found")
+            raise FileNotFoundError
+        else:
+            get_case_accuracy(test_data, parent)
+
     # Visualize prediction
     if args.visualize:
         parent = output_dir.parent
         u_result_path = parent / "u"
         v_result_path = parent / "v"
 
-        if not u_result_path.is_dir():
-            print("[INFO] Directory containing u velocity results not found")
-        if not v_result_path.is_dir():
-            print("[INFO] Directory containing v velocity results not found")
-        if u_result_path.is_dir() and v_result_path.is_dir():
-            print("[INFO] Directory containing u and v velocity results are found")
+        if not check_file_exists(u_result_path):
+            print(f"[Warning] u velocity results in {parent} not found")
+            raise FileNotFoundError
+        elif not check_file_exists(v_result_path):
+            print(f"[Warning] v velocity results in {parent} not found")
+            raise FileNotFoundError
+        else:
             get_visualize_result(test_data, parent, args.data_to_visualize)
-
-    # Calculate prediction accuracy
-    if args.cal_case_accuracy:
-        parent = output_dir.parent
-        get_case_accuracy(test_data, parent)
 
 
 if __name__ == "__main__":
