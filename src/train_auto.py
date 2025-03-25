@@ -29,7 +29,7 @@ from utils import (
 )
 from utils_auto import init_model
 from args import Args
-from get_result import get_visualize_result, get_case_accuracy
+from get_result import get_visualize_result, get_case_accuracy, cal_loss
 
 
 def collate_fn(batch: list):
@@ -393,6 +393,7 @@ def main():
             raise FileNotFoundError
         else:
             get_case_accuracy(test_data, parent)
+            cal_loss(test_data, parent)
 
     # Visualize prediction
     if args.visualize:
