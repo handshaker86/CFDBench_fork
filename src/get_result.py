@@ -1,11 +1,9 @@
 from pathlib import Path
-from torch import Tensor
 
 import numpy as np
 import torch
 
 from utils import load_json, check_file_exists, generate_frame
-from utils_auto import get_frame_accuracy
 from dataset.cavity import CavityFlowAutoDataset
 
 
@@ -118,8 +116,6 @@ def get_visualize_result(
         else:
             count += frame_num_list[i]
 
-    
-
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
     v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
     assert u_prediction.shape == v_prediction.shape
@@ -135,6 +131,32 @@ def get_visualize_result(
     )
 
     print("Getting visualing result finished.")
+
+
+def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
+    # Calculate the prediction accuracy for one frame
+    u_p_frame = u_p_frame.numpy()
+    v_p_frame = v_p_frame.numpy()
+    u_r_frame = u_r_frame.numpy()
+    v_r_frame = v_r_frame.numpy()
+
+    vel_p = np.sqrt(u_p_frame**2 + v_p_frame**2)
+    vel_r = np.sqrt(u_r_frame**2 + v_r_frame**2)
+    angle_p = np.arctan2(v_p_frame, u_p_frame)
+    angle_r = np.arctan2(v_r_frame, u_r_frame)
+
+    delta_angle = angle_p - angle_r
+
+    SI = np.cos(delta_angle)
+    mask_1 = SI > 0.8
+
+    MI = 1 - abs(vel_p - vel_r) / (vel_r + vel_p)
+    mask_2 = MI > 0.8
+
+    mask = mask_1 * mask_2
+    good_pred_rate = np.sum(mask) / mask.size
+
+    return good_pred_rate
 
 
 def get_case_accuracy(
