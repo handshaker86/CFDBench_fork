@@ -292,21 +292,19 @@ class CavityFlowAutoDataset(CfdAutoDataset):
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
 
+            self.case_params.append(this_case_params)
             num_steps = len(outputs)
             if num_steps <= 0:
                 continue
+            self.case_name_list.append(case_dir.name)
 
             if self.norm_props:
                 normalize_physics_props(this_case_params)
             if self.norm_bc:
                 normalize_bc(this_case_params, "vel_top")
-
-            self.case_name_list.append(case_dir.parent.name + case_dir.name[5:])
-            self.frame_num_list.append(num_steps)
-            self.case_params.append(this_case_params)
+            
             # Loop frames, get input-output pairs
             # Stop when converged
-
             early_converged = False
             for i in range(num_steps):
                 inp = torch.tensor(inputs[i], dtype=torch.float32)  # (3, h, w)

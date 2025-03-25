@@ -25,11 +25,11 @@ from utils import (
     get_output_dir,
     load_best_ckpt,
     plot_predictions,
-    check_file_exists,
+    check_path_exists,
 )
 from utils_auto import init_model
 from args import Args
-from get_result import get_visualize_result, get_case_accuracy, cal_loss
+from get_result import get_visualize_result, get_case_accuracy, cal_loss, cal_predict_time
 
 
 def collate_fn(batch: list):
@@ -382,29 +382,30 @@ def main():
     # Calculate prediction accuracy
     if args.cal_case_accuracy:
         parent = output_dir.parent
-        u_result_path = parent / "u"
-        v_result_path = parent / "v"
+        u_result_path = Path(parent / "u")
+        v_result_path = Path(parent / "v")
 
-        if not check_file_exists(u_result_path):
+        if not check_path_exists(u_result_path):
             print(f"[Warning] u velocity results in {parent} not found")
             raise FileNotFoundError
-        elif not check_file_exists(v_result_path):
+        elif not check_path_exists(v_result_path):
             print(f"[Warning] v velocity results in {parent} not found")
             raise FileNotFoundError
         else:
             get_case_accuracy(test_data, parent)
             cal_loss(test_data, parent)
+            cal_predict_time(parent)
 
     # Visualize prediction
     if args.visualize:
         parent = output_dir.parent
-        u_result_path = parent / "u"
-        v_result_path = parent / "v"
+        u_result_path = Path(parent / "u")
+        v_result_path = Path(parent / "v")
 
-        if not check_file_exists(u_result_path):
+        if not check_path_exists(u_result_path):
             print(f"[Warning] u velocity results in {parent} not found")
             raise FileNotFoundError
-        elif not check_file_exists(v_result_path):
+        elif not check_path_exists(v_result_path):
             print(f"[Warning] v velocity results in {parent} not found")
             raise FileNotFoundError
         else:

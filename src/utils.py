@@ -318,3 +318,6 @@ def get_dir_nums(dir: Path):
 
 def check_file_exists(file_path):
     return Path(file_path).is_file()
+
+def check_path_exists(path):
+    return Path(path).exists()

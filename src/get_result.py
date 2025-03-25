@@ -149,7 +149,7 @@ def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
     mask_2 = MI > 0.8
 
     mask = mask_1 * mask_2
-    good_pred_rate = torch.sum(mask) / mask.size
+    good_pred_rate = torch.sum(mask) / mask.numel()
 
     return good_pred_rate
 
@@ -199,6 +199,8 @@ def get_case_accuracy(
 
         f.write(f"Average case accuracy: {np.mean(case_accuracy_list)}\n")
 
+    print(f"Case accuracy saved in {accuracy_save_path}")
+
 
 def calculate_metrics(y_true, y_pred):
     """
@@ -206,24 +208,24 @@ def calculate_metrics(y_true, y_pred):
     y_pred: Tensor of shape (n, c, h, w), predicted values
     """
     # RMSE (Root Mean Squared Error) over all dimensions
-    rmse_mat = torch.sqrt(torch.mean((y_true - y_pred) ** 2, axis=(-1, -2)))
+    rmse_mat = torch.sqrt(torch.mean((y_true - y_pred) ** 2, dim=(-1, -2)))
     rmse = torch.mean(rmse_mat)
 
     # Normalized RMSE (nRMSE)
-    range_y = torch.max(y_true, axis=(-1, -2)) - torch.min(y_true, axis=(-1, -2))
-    mean_y = torch.mean(y_true, axis=(-1, -2))
+    range_y = torch.amax(y_true, dim=(-1, -2)) - torch.amin(y_true, dim=(-1, -2))
+    mean_y = torch.mean(y_true, dim=(-1, -2))
     nrmse_range = torch.mean(rmse_mat / range_y)
     nrmse_mean = torch.mean(rmse_mat / mean_y)
 
     # Maximum Error
-    max_err_mat = torch.max(torch.abs(y_true - y_pred), axis=(-1, -2))
+    max_err_mat = torch.amax(torch.abs(y_true - y_pred), dim=(-1, -2))
     max_error = torch.mean(max_err_mat)
 
     return {
-        "RMSE": rmse,
-        "nRMSE (range)": nrmse_range,
-        "nRMSE (mean)": nrmse_mean,
-        "Max Error": max_error,
+        "RMSE": rmse.item(),
+        "nRMSE (range)": nrmse_range.item(),
+        "nRMSE (mean)": nrmse_mean.item(),
+        "Max Error": max_error.item(),
     }
 
 
@@ -249,6 +251,31 @@ def cal_loss(test_data: CavityFlowAutoDataset, prediction_path: Path):
         for key, value in loss.items():
             f.write(f"{key}: {value}\n")
 
+    print(f"Loss saved in {loss_save_path}")
+
+def cal_predict_time(prediction_path:Path):
+    u_prediction_time = prediction_path / "u" / "test" / "predict_time.txt"
+    v_prediction_time = prediction_path / "v" / "test" / "predict_time.txt"
+
+
+    with open(u_prediction_time, "r") as f:
+        u_predict_time = 0.0
+        line = f.readline()
+        colon_index = line.find(":")
+        u_predict_time = float(line[colon_index + 1 :].strip())
+
+    with open(v_prediction_time, "r") as f:
+        v_predict_time = 0.0
+        line = f.readline()
+        colon_index = line.find(":")
+        v_predict_time = float(line[colon_index + 1 :].strip())
+
+    predict_time = u_predict_time + v_predict_time
+
+    with open(prediction_path / "predict_time.txt", "w") as f:
+        f.write(f"Total predict_time: {predict_time}")
+
+    print(f"Predict time saved in {prediction_path}")
 
 if __name__ == "__main__":
     result_dir = Path("result/auto")
