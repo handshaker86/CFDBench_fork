@@ -392,7 +392,7 @@ def main():
         v_result_path = Path(parent / "v")
 
         # init result_save_path
-        time_step = args.delta_time / 0.1
+        time_step = int(args.delta_time / 0.1)
         model_name = args.model.split("_")[1]
         data_name = args.data_name
         result_save_path = Path(
