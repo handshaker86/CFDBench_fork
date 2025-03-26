@@ -155,13 +155,11 @@ def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
 
 
 def get_case_accuracy(
-    test_data: CavityFlowAutoDataset,
-    prediction_path: Path,
+    test_data: CavityFlowAutoDataset, prediction_path: Path, result_save_path: Path
 ):
     u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
     v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
-    accuracy_save_path = prediction_path / "accuracy_result"
-    accuracy_save_path.mkdir(exist_ok=True, parents=True)
+    result_save_path.mkdir(exist_ok=True, parents=True)
 
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
     v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
@@ -192,14 +190,14 @@ def get_case_accuracy(
             count += 1
             accuracy_list = []
 
-    with open(accuracy_save_path / "case_accuracy.txt", "w") as f:
+    with open(result_save_path / "case_accuracy.txt", "w") as f:
         assert len(name_list) == len(case_accuracy_list)
         for i in range(len(case_accuracy_list)):
             f.write(f"{name_list[i]}: {case_accuracy_list[i]}\n")
 
         f.write(f"Average case accuracy: {np.mean(case_accuracy_list)}\n")
 
-    print(f"Case accuracy saved in {accuracy_save_path}")
+    print(f"Case accuracy saved in {result_save_path}")
 
 
 def calculate_metrics(y_true, y_pred):
@@ -229,11 +227,12 @@ def calculate_metrics(y_true, y_pred):
     }
 
 
-def cal_loss(test_data: CavityFlowAutoDataset, prediction_path: Path):
+def cal_loss(
+    test_data: CavityFlowAutoDataset, prediction_path: Path, result_save_path: Path
+):
     u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
     v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
-    loss_save_path = prediction_path / "loss_result"
-    loss_save_path.mkdir(exist_ok=True, parents=True)
+    result_save_path.mkdir(exist_ok=True, parents=True)
 
     u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
     v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
@@ -247,16 +246,16 @@ def cal_loss(test_data: CavityFlowAutoDataset, prediction_path: Path):
     real = torch.stack([u_real, v_real], dim=1)
 
     loss = calculate_metrics(real, prediction)
-    with open(loss_save_path / "loss.txt", "w") as f:
+    with open(result_save_path / "loss.txt", "w") as f:
         for key, value in loss.items():
             f.write(f"{key}: {value}\n")
 
-    print(f"Loss saved in {loss_save_path}")
+    print(f"Loss saved in {result_save_path}")
 
-def cal_predict_time(prediction_path:Path):
+
+def cal_predict_time(prediction_path: Path, result_save_path: Path):
     u_prediction_time = prediction_path / "u" / "test" / "predict_time.txt"
     v_prediction_time = prediction_path / "v" / "test" / "predict_time.txt"
-
 
     with open(u_prediction_time, "r") as f:
         u_predict_time = 0.0
@@ -272,10 +271,11 @@ def cal_predict_time(prediction_path:Path):
 
     predict_time = u_predict_time + v_predict_time
 
-    with open(prediction_path / "predict_time.txt", "w") as f:
+    with open(result_save_path / "predict_time.txt", "w") as f:
         f.write(f"Total predict_time: {predict_time}")
 
     print(f"Predict time saved in {prediction_path}")
+
 
 if __name__ == "__main__":
     result_dir = Path("result/auto")

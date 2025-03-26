@@ -386,20 +386,27 @@ def main():
 
     # Calculate prediction accuracy
     if args.cal_case_accuracy:
+        # init prediction path
         parent = output_dir.parent
         u_result_path = Path(parent / "u")
         v_result_path = Path(parent / "v")
 
+        # init result_save_path
+        time_step = args.delta_time / 0.1
+        model_name = args.model.split("_")[1]
+        data_name = args.data_name
+        result_save_path = Path(
+            f"results/time_step={time_step}/{model_name}/{data_name}"
+        )
+
         if not check_path_exists(u_result_path):
             print(f"[Warning] u velocity results in {parent} not found")
-            raise FileNotFoundError
         elif not check_path_exists(v_result_path):
             print(f"[Warning] v velocity results in {parent} not found")
-            raise FileNotFoundError
         else:
-            get_case_accuracy(test_data, parent)
-            cal_loss(test_data, parent)
-            cal_predict_time(parent)
+            get_case_accuracy(test_data, parent, result_save_path)
+            cal_loss(test_data, parent, result_save_path)
+            cal_predict_time(parent, result_save_path)
 
     # Visualize prediction
     if args.visualize:
