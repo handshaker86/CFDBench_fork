@@ -2,6 +2,7 @@ from pathlib import Path
 from typing import Tuple, List, Dict, Any, Optional
 from bisect import bisect_right
 import random
+import json
 
 import torch
 from torch import Tensor
@@ -268,6 +269,10 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
             self.case_ids = torch.load(self.cache_dir / "case_ids.pt")
             self.case_params = torch.load(self.cache_dir / "case_params.pt")
             self.all_features = torch.load(self.cache_dir / "all_features.pt")
+            with open(self.cache_dir / "case_data.json") as f:
+                case_data = json.load(f)
+                self.case_name_list = case_data["case_name_list"]
+                self.frame_num_list = case_data["frame_num_list"]
             return
 
         self.case_params: List[dict] = []
@@ -335,6 +340,14 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
         torch.save(self.case_ids, self.cache_dir / "case_ids.pt")
         torch.save(self.case_params, self.cache_dir / "case_params.pt")
         torch.save(self.all_features, self.cache_dir / "all_features.pt")
+        case_data = (
+            {
+                "case_name_list": self.case_name_list,
+                "frame_num_list": self.frame_num_list,
+            },
+        )
+        with open(self.cache_dir / "case_data.json", "w") as f:
+            json.dump(case_data, f, indent=4)
 
     def __getitem__(self, idx: int):
         inputs = self.inputs[idx]  # (3, h, w)
