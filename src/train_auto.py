@@ -29,7 +29,12 @@ from utils import (
 )
 from utils_auto import init_model
 from args import Args
-from get_result import get_visualize_result, get_case_accuracy, cal_loss, cal_predict_time
+from get_result import (
+    get_visualize_result,
+    get_case_accuracy,
+    cal_loss,
+    cal_predict_time,
+)
 
 
 def collate_fn(batch: list):
@@ -111,13 +116,13 @@ def evaluate(
                 # Dump input, label and prediction flow images.
                 image_dir = output_dir / "images"
                 image_dir.mkdir(exist_ok=True, parents=True)
-                plot_predictions(
-                    inp=inputs[0][0],
-                    label=labels[0][0],
-                    pred=preds[0][0],
-                    out_dir=image_dir,
-                    step=step,
-                )
+                # plot_predictions(
+                #     inp=inputs[0][0],
+                #     label=labels[0][0],
+                #     pred=preds[0][0],
+                #     out_dir=image_dir,
+                #     step=step,
+                # )
     end_time = time.time()
     with open(output_dir / "predict_time.txt", "w") as f:
         f.write(f"Time taken for generating prediction: {end_time - start_time}")
