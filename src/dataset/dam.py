@@ -283,6 +283,7 @@ class DamFlowAutoDataset(CfdAutoDataset):
             if num_steps <= 0:
                 continue
             self.case_name_list.append(case_dir.name)
+            self.frame_num_list.append(num_steps)
 
             if self.norm_props:
                 normalize_physics_props(this_case_params)
