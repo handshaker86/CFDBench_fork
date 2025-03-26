@@ -274,7 +274,7 @@ def cal_predict_time(prediction_path: Path, result_save_path: Path):
     with open(result_save_path / "predict_time.txt", "w") as f:
         f.write(f"Total predict_time: {predict_time}")
 
-    print(f"Predict time saved in {prediction_path}")
+    print(f"Predict time saved in {result_save_path}")
 
 
 if __name__ == "__main__":
