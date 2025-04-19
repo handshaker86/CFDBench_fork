@@ -393,7 +393,10 @@ def main():
 
         # init result_save_path
         time_step = int(args.delta_time / 0.1)
-        model_name = args.model.split("_")[1]
+        if len(args.model.split("_")) > 1:
+            model_name = args.model.split("_")[1]
+        else:
+            model_name = args.model
         data_name = args.data_name
         result_save_path = Path(
             f"results/time_step={time_step}/{model_name}/{data_name}"
