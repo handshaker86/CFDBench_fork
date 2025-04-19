@@ -224,6 +224,7 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         f"dt{args.delta_time}",
         args.model,
     )
+
     if args.model == "deeponet":
         dir_name = (
             f"lr{args.lr}"
@@ -235,15 +236,10 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             + f"-{args.act_scale_invariant}"
             + f"-{args.act_on_output}"
         )
-
-        output_dir /= dir_name
-        return output_dir
     elif args.model == "unet":
         dir_name = (
             f"lr{args.lr}" f"_d{args.unet_dim}" f"_cp{args.unet_insert_case_params_at}"
         )
-        output_dir /= dir_name
-        return output_dir
     elif args.model == "fno":
         dir_name = (
             f"lr{args.lr}"
@@ -252,13 +248,10 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             + f"_m1{args.fno_modes_x}"
             + f"_m2{args.fno_modes_y}"
         )
-        output_dir /= dir_name
-        return output_dir
     elif args.model == "resnet":
         dir_name = (
             f"lr{args.lr}" f"_d{args.resnet_depth}" f"_w{args.resnet_hidden_chan}"
         )
-        return output_dir / dir_name
     elif args.model == "auto_edeeponet":
         dir_name = (
             f"lr{args.lr}"
@@ -270,13 +263,7 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             # + f"-{args.act_scale_invariant}"
             # + f"-{args.act_on_output}"
         )
-        return output_dir / dir_name
     elif args.model == "auto_deeponet":
-        if args.velocity_dim == 0:
-            velocity_dim = "u"
-        else:
-            velocity_dim = "v"
-
         dir_name = (
             f"lr{args.lr}"
             f"_width{args.deeponet_width}"
@@ -285,22 +272,25 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             f"_normprop{args.norm_props}"
             f"_act{args.act_fn}"
         )
-        output_dir /= dir_name
-        output_dir /= velocity_dim
-        return output_dir
     elif args.model == "auto_ffn":
         dir_name = (
             f"lr{args.lr}" f"_width{args.autoffn_width}" f"_depth{args.autoffn_depth}"
         )
-        return output_dir / dir_name
     elif args.model == "auto_deeponet_cnn":
         dir_name = f"lr{args.lr}" f"_depth{args.autoffn_depth}"
-        return output_dir / dir_name
     elif args.model == "ffn":
         dir_name = f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
-        return output_dir / dir_name
     else:
         raise NotImplementedError
+
+    if args.velocity_dim == 0:
+        velocity_dim = "u"
+    else:
+        velocity_dim = "v"
+
+    output_dir /= dir_name
+    output_dir /= velocity_dim
+    return output_dir
 
 
 def load_best_ckpt(model, output_dir: Path):
@@ -318,6 +308,7 @@ def get_dir_nums(dir: Path):
 
 def check_file_exists(file_path):
     return Path(file_path).is_file()
+
 
 def check_path_exists(path):
     return Path(path).exists()
