@@ -262,18 +262,18 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
             self.case_ids: List[int]  # Each sample's case ID
         """
         # Cache preprocessing for speedup
-        if self.cache_dir.exists():
-            print(f"Loading from cache: {self.cache_dir}")
-            self.inputs = torch.load(self.cache_dir / "inputs.pt")
-            self.labels = torch.load(self.cache_dir / "labels.pt")
-            self.case_ids = torch.load(self.cache_dir / "case_ids.pt")
-            self.case_params = torch.load(self.cache_dir / "case_params.pt")
-            self.all_features = torch.load(self.cache_dir / "all_features.pt")
-            with open(self.cache_dir / "case_data.json") as f:
-                case_data = json.load(f)
-                self.case_name_list = case_data["case_name_list"]
-                self.frame_num_list = case_data["frame_num_list"]
-            return
+        # if self.cache_dir.exists():
+        #     print(f"Loading from cache: {self.cache_dir}")
+        #     self.inputs = torch.load(self.cache_dir / "inputs.pt")
+        #     self.labels = torch.load(self.cache_dir / "labels.pt")
+        #     self.case_ids = torch.load(self.cache_dir / "case_ids.pt")
+        #     self.case_params = torch.load(self.cache_dir / "case_params.pt")
+        #     self.all_features = torch.load(self.cache_dir / "all_features.pt")
+        #     with open(self.cache_dir / "case_data.json") as f:
+        #         case_data = json.load(f)
+        #         self.case_name_list = case_data["case_name_list"]
+        #         self.frame_num_list = case_data["frame_num_list"]
+        #     return
 
         self.case_params: List[dict] = []
         all_inputs: List[Tensor] = []
@@ -294,6 +294,7 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
             self.case_params.append(this_case_params)
             num_steps = len(outputs)
             if num_steps <= 0:
+                print(f"Case {case_dir.name} has no steps")
                 continue
             self.case_name_list.append(case_dir.name)
 
@@ -334,20 +335,22 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
         self.case_ids = all_case_ids
 
         # Cache
-        self.cache_dir.mkdir(parents=True, exist_ok=True)
-        torch.save(self.inputs, self.cache_dir / "inputs.pt")
-        torch.save(self.labels, self.cache_dir / "labels.pt")
-        torch.save(self.case_ids, self.cache_dir / "case_ids.pt")
-        torch.save(self.case_params, self.cache_dir / "case_params.pt")
-        torch.save(self.all_features, self.cache_dir / "all_features.pt")
-        case_data = (
-            {
-                "case_name_list": self.case_name_list,
-                "frame_num_list": self.frame_num_list,
-            },
-        )
-        with open(self.cache_dir / "case_data.json", "w") as f:
-            json.dump(case_data, f, indent=4)
+        # self.cache_dir.mkdir(parents=True, exist_ok=True)
+        # torch.save(self.inputs, self.cache_dir / "inputs.pt")
+        # torch.save(self.labels, self.cache_dir / "labels.pt")
+        # torch.save(self.case_ids, self.cache_dir / "case_ids.pt")
+        # torch.save(self.case_params, self.cache_dir / "case_params.pt")
+        # torch.save(self.all_features, self.cache_dir / "all_features.pt")
+        # case_data = (
+        #     {
+        #         "case_name_list": self.case_name_list,
+        #         "frame_num_list": self.frame_num_list,
+        #     }
+        # )
+        # with open(self.cache_dir / "case_data.json", "w") as f:
+        #     json.dump(case_data, f, indent=4)
+
+        # import pdb; pdb.set_trace()
 
     def __getitem__(self, idx: int):
         inputs = self.inputs[idx]  # (3, h, w)
@@ -390,7 +393,7 @@ def get_cylinder_datasets(
     # Split into train, dev, test
     num_cases = len(case_dirs)
     num_train = int(num_cases * 0.8)
-    num_dev = int(num_cases * 0.1)
+    num_dev = int(num_cases * 0.15)
     train_case_dirs = case_dirs[:num_train]
     dev_case_dirs = case_dirs[num_train : num_train + num_dev]
     test_case_dirs = case_dirs[num_train + num_dev :]
@@ -443,7 +446,7 @@ def get_cylinder_auto_datasets(
     # Split into train, dev, test
     num_cases = len(case_dirs)
     num_train = int(num_cases * 0.8)
-    num_dev = int(num_cases * 0.1)
+    num_dev = int(num_cases * 0.15)
     train_case_dirs = case_dirs[:num_train]
     dev_case_dirs = case_dirs[num_train : num_train + num_dev]
     test_case_dirs = case_dirs[num_train + num_dev :]
