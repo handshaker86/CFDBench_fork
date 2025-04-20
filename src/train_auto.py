@@ -80,13 +80,13 @@ def evaluate(
     scores = {name: [] for name in model.loss_fn.get_score_names()}
     input_scores = deepcopy(scores)
     all_preds: List[Tensor] = []
+    inference_time = 0.0
     print("=== Evaluating ===")
     print(f"# examples: {len(data)}")
     print(f"Batch size: {batch_size}")
     print(f"# batches: {len(loader)}")
     print(f"Plot interval: {plot_interval}")
     print(f"Output dir: {output_dir}")
-    start_time = time.time()
     model.eval()
     with torch.inference_mode():
         for step, batch in enumerate(tqdm(loader)):
@@ -100,7 +100,11 @@ def evaluate(
                 input_scores[key].append(input_loss[key].cpu().tolist())
 
             # Compute the prediction and its loss
+            start_time = time.time()
             outputs: dict = model(**batch)
+            end_time = time.time()
+            inference_time += end_time - start_time
+
             loss: dict = outputs["loss"]
             preds: Tensor = outputs["preds"]
             height, width = inputs.shape[2:]
@@ -116,16 +120,15 @@ def evaluate(
                 # Dump input, label and prediction flow images.
                 image_dir = output_dir / "images"
                 image_dir.mkdir(exist_ok=True, parents=True)
-                # plot_predictions(
-                #     inp=inputs[0][0],
-                #     label=labels[0][0],
-                #     pred=preds[0][0],
-                #     out_dir=image_dir,
-                #     step=step,
-                # )
-    end_time = time.time()
+                plot_predictions(
+                    inp=inputs[0][0],
+                    label=labels[0][0],
+                    pred=preds[0][0],
+                    out_dir=image_dir,
+                    step=step,
+                )
     with open(output_dir / "predict_time.txt", "w") as f:
-        f.write(f"Time taken for generating prediction: {end_time - start_time}")
+        f.write(f"Time taken for generating prediction: {inference_time}")
     print(f"Predict has been saved to {output_dir/'predict_time.txt'}")
 
     if measure_time:
