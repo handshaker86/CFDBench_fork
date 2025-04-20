@@ -382,7 +382,7 @@ def main():
             model,
             test_data,
             output_dir / "test",
-            batch_size=1,
+            batch_size=len(test_data),
             infer_steps=20,
             plot_interval=10,
         )
@@ -395,7 +395,11 @@ def main():
         v_result_path = Path(parent / "v")
 
         # init result_save_path
-        time_step = int(args.delta_time / 0.1)
+        if "cylinder" in args.data_name:
+            time_step = int(args.delta_time / 0.001)
+        else:
+            time_step = int(args.delta_time / 0.1)
+
         if len(args.model.split("_")) > 1:
             model_name = args.model.split("_")[1]
         else:
