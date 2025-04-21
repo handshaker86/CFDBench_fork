@@ -88,21 +88,11 @@ def get_result(result_dir: Path, data_pattern: str, model_pattern: str):
 
 
 def get_visualize_result(
-    test_data: CavityFlowAutoDataset, velocity_path: Path, data_to_visualize: str
+    test_data: CavityFlowAutoDataset,
+    velocity_path: Path,
+    data_to_visualize: str,
+    is_autodeeponet: bool = False,
 ):
-    print("Getting visualing result...")
-
-    u_prediction_path = velocity_path / "u" / "test" / "preds.pt"
-    v_prediction_path = velocity_path / "v" / "test" / "preds.pt"
-
-    if not check_file_exists(u_prediction_path):
-        print("[ERROR] u prediction result not found")
-        return
-
-    if not check_file_exists(v_prediction_path):
-        print("[ERROR] v prediction result not found")
-        return
-
     count = 0
     dir_frame_range = []
     frame_num_list = test_data.frame_num_list
@@ -116,13 +106,23 @@ def get_visualize_result(
         else:
             count += frame_num_list[i]
 
-    u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
-    v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
-    assert u_prediction.shape == v_prediction.shape
+    print("Getting visualing result...")
+
+    if is_autodeeponet:
+        u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
+        v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+        u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
+        v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+    else:
+        prediction_path = prediction_path / "test" / "preds.pt"
+        prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
+        u_prediction = prediction[: prediction.shape[0] // 2, :, :]
+        v_prediction = prediction[prediction.shape[0] // 2 :, :, :]
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
     assert u_real.shape == v_real.shape
+    assert u_prediction.shape == v_prediction.shape
 
     image_save_path = velocity_path / "visualize_result" / data_to_visualize
     image_save_path.mkdir(exist_ok=True, parents=True)
@@ -155,19 +155,29 @@ def get_frame_accuracy(u_p_frame, v_p_frame, u_r_frame, v_r_frame):
 
 
 def get_case_accuracy(
-    test_data: CavityFlowAutoDataset, prediction_path: Path, result_save_path: Path
+    test_data: CavityFlowAutoDataset,
+    prediction_path: Path,
+    result_save_path: Path,
+    is_autodeeponet: bool = False,
 ):
-    u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
-    v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
-    result_save_path.mkdir(exist_ok=True, parents=True)
+    if is_autodeeponet:
+        u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
+        v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+        result_save_path.mkdir(exist_ok=True, parents=True)
 
-    u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
-    v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
-    assert u_prediction.shape == v_prediction.shape
+        u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
+        v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+    else:
+        prediction_path = prediction_path / "test" / "preds.pt"
+        result_save_path.mkdir(exist_ok=True, parents=True)
+        prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
+        u_prediction = prediction[: prediction.shape[0] // 2, :, :]
+        v_prediction = prediction[prediction.shape[0] // 2 :, :, :]
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
     assert u_real.shape == v_real.shape
+    assert u_prediction.shape == v_prediction.shape
 
     name_list = test_data.case_name_list
     frame_num_list = test_data.frame_num_list
@@ -228,19 +238,29 @@ def calculate_metrics(y_true, y_pred):
 
 
 def cal_loss(
-    test_data: CavityFlowAutoDataset, prediction_path: Path, result_save_path: Path
+    test_data: CavityFlowAutoDataset,
+    prediction_path: Path,
+    result_save_path: Path,
+    is_autodeeponet: bool = False,
 ):
-    u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
-    v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
-    result_save_path.mkdir(exist_ok=True, parents=True)
+    if is_autodeeponet:
+        u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
+        v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+        result_save_path.mkdir(exist_ok=True, parents=True)
 
-    u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
-    v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
-    assert u_prediction.shape == v_prediction.shape
+        u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
+        v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+    else:
+        prediction_path = prediction_path / "test" / "preds.pt"
+        result_save_path.mkdir(exist_ok=True, parents=True)
+        prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
+        u_prediction = prediction[: prediction.shape[0] // 2, :, :]
+        v_prediction = prediction[prediction.shape[0] // 2 :, :, :]
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
     assert u_real.shape == v_real.shape
+    assert u_prediction.shape == v_prediction.shape
 
     prediction = torch.stack([u_prediction, v_prediction], dim=1)
     real = torch.stack([u_real, v_real], dim=1)
@@ -253,23 +273,34 @@ def cal_loss(
     print(f"Loss saved in {result_save_path}")
 
 
-def cal_predict_time(prediction_path: Path, result_save_path: Path):
-    u_prediction_time = prediction_path / "u" / "test" / "predict_time.txt"
-    v_prediction_time = prediction_path / "v" / "test" / "predict_time.txt"
+def cal_predict_time(
+    prediction_path: Path, result_save_path: Path, is_autodeeponet: bool = False
+):
+    if is_autodeeponet:
+        u_prediction_time = prediction_path / "u" / "test" / "predict_time.txt"
+        v_prediction_time = prediction_path / "v" / "test" / "predict_time.txt"
 
-    with open(u_prediction_time, "r") as f:
-        u_predict_time = 0.0
-        line = f.readline()
-        colon_index = line.find(":")
-        u_predict_time = float(line[colon_index + 1 :].strip())
+        with open(u_prediction_time, "r") as f:
+            u_predict_time = 0.0
+            line = f.readline()
+            colon_index = line.find(":")
+            u_predict_time = float(line[colon_index + 1 :].strip())
 
-    with open(v_prediction_time, "r") as f:
-        v_predict_time = 0.0
-        line = f.readline()
-        colon_index = line.find(":")
-        v_predict_time = float(line[colon_index + 1 :].strip())
+        with open(v_prediction_time, "r") as f:
+            v_predict_time = 0.0
+            line = f.readline()
+            colon_index = line.find(":")
+            v_predict_time = float(line[colon_index + 1 :].strip())
 
-    predict_time = u_predict_time + v_predict_time
+        predict_time = u_predict_time + v_predict_time
+
+    else:
+        prediction_path = prediction_path / "test" / "predict_time.txt"
+        with open(prediction_path, "r") as f:
+            predict_time = 0.0
+            line = f.readline()
+            colon_index = line.find(":")
+            predict_time = float(line[colon_index + 1 :].strip())
 
     with open(result_save_path / "predict_time.txt", "w") as f:
         f.write(f"Total predict_time: {predict_time}")

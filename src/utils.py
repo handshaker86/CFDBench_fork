@@ -289,7 +289,8 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         velocity_dim = "v"
 
     output_dir /= dir_name
-    output_dir /= velocity_dim
+    if args.model == "auto_deeponet":
+        output_dir /= velocity_dim
     return output_dir
 
 

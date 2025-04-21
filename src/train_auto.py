@@ -389,10 +389,9 @@ def main():
 
     # Calculate prediction accuracy
     if args.cal_case_accuracy:
-        # init prediction path
-        parent = output_dir.parent
-        u_result_path = Path(parent / "u")
-        v_result_path = Path(parent / "v")
+        # init output_dir
+        if args.model == "auto_deeponet":
+            output_dir = output_dir.parent
 
         # init result_save_path
         if "cylinder" in args.data_name:
@@ -409,29 +408,54 @@ def main():
             f"results/time_step={time_step}/{model_name}/{data_name}"
         )
 
-        if not check_path_exists(u_result_path):
-            print(f"[Warning] u velocity results in {parent} not found")
-        elif not check_path_exists(v_result_path):
-            print(f"[Warning] v velocity results in {parent} not found")
+        # check if the results exists
+        if args.model == "auto_deeponet":
+            u_result_path = Path(output_dir / "u")
+            v_result_path = Path(output_dir / "v")
+            if not check_path_exists(u_result_path):
+                raise FileNotFoundError(
+                    f"[Warning] u velocity results in {output_dir} not found, please run the test first"
+                )
+            elif not check_path_exists(v_result_path):
+                raise FileNotFoundError(
+                    f"[Warning] v velocity results in {output_dir} not found, please run the test first"
+                )
         else:
-            get_case_accuracy(test_data, parent, result_save_path)
-            cal_loss(test_data, parent, result_save_path)
-            cal_predict_time(parent, result_save_path)
+            if not check_path_exists(output_dir):
+                raise FileNotFoundError(
+                    f"[Warning] {output_dir} not found, please run the test first"
+                )
+
+        is_autodeeponet = args.model == "auto_deeponet"
+        get_case_accuracy(test_data, output_dir, result_save_path, is_autodeeponet)
+        cal_loss(test_data, output_dir, result_save_path, is_autodeeponet)
+        cal_predict_time(output_dir, result_save_path, is_autodeeponet)
 
     # Visualize prediction
     if args.visualize:
-        parent = output_dir.parent
-        u_result_path = Path(parent / "u")
-        v_result_path = Path(parent / "v")
+        # init output_dir
+        if args.model == "auto_deeponet":
+            output_dir = output_dir.parent
 
-        if not check_path_exists(u_result_path):
-            print(f"[Warning] u velocity results in {parent} not found")
-            raise FileNotFoundError
-        elif not check_path_exists(v_result_path):
-            print(f"[Warning] v velocity results in {parent} not found")
-            raise FileNotFoundError
+        # check if the results exists
+        if args.model == "auto_deeponet":
+            u_result_path = Path(output_dir / "u")
+            v_result_path = Path(output_dir / "v")
+            if not check_path_exists(u_result_path):
+                raise FileNotFoundError(
+                    f"[Warning] u velocity results in {output_dir} not found, please run the test first"
+                )
+            elif not check_path_exists(v_result_path):
+                raise FileNotFoundError(
+                    f"[Warning] v velocity results in {output_dir} not found, please run the test first"
+                )
         else:
-            get_visualize_result(test_data, parent, args.data_to_visualize)
+            if not check_path_exists(output_dir):
+                raise FileNotFoundError(
+                    f"[Warning] {output_dir} not found, please run the test first"
+                )
+        is_autodeeponet = args.model == "auto_deeponet"
+        get_visualize_result(test_data, output_dir, args.data_to_visualize,is_autodeeponet)
 
 
 if __name__ == "__main__":
