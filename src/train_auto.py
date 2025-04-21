@@ -91,31 +91,31 @@ def evaluate(
     with torch.inference_mode():
         for step, batch in enumerate(tqdm(loader)):
             # inputs, labels, case_params = batch
+            start_time = time.time()
             inputs = batch["inputs"]  # (b, 2, h, w)
             labels = batch["label"]  # (b, 2, h, w)
 
-            # Compute difference between the input and label
-            input_loss: dict = model.loss_fn(labels=labels[:, :1], preds=inputs[:, :1])
-            for key in input_scores:
-                input_scores[key].append(input_loss[key].cpu().tolist())
-
-            # Compute the prediction and its loss
-            start_time = time.time()
+            # Compute the prediction
             outputs: dict = model(**batch)
-            end_time = time.time()
-            inference_time += end_time - start_time
-
             loss: dict = outputs["loss"]
             preds: Tensor = outputs["preds"]
             height, width = inputs.shape[2:]
 
             # When using DeepONetAuto, the prediction is a flattened.
             preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
-            # loss = model.loss_fn(labels=labels[:, :1], preds=preds)
-            for key in scores:
-                scores[key].append(loss[key].cpu().tolist())
             # preds = preds.repeat(1, 3, 1, 1)
             all_preds.append(preds.cpu().detach())
+            end_time = time.time()
+            inference_time += end_time - start_time
+            # loss = model.loss_fn(labels=labels[:, :1], preds=preds)
+
+            # Compute difference between the input and label
+            input_loss: dict = model.loss_fn(labels=labels[:, :1], preds=inputs[:, :1])
+            for key in input_scores:
+                input_scores[key].append(input_loss[key].cpu().tolist())
+            for key in scores:
+                scores[key].append(loss[key].cpu().tolist())
+
             if step % plot_interval == 0 and not measure_time:
                 # Dump input, label and prediction flow images.
                 image_dir = output_dir / "images"
