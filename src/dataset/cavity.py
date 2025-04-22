@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Tuple, List, Dict, Union, Any
 from bisect import bisect_right
@@ -296,13 +297,17 @@ class CavityFlowAutoDataset(CfdAutoDataset):
             num_steps = len(outputs)
             if num_steps <= 0:
                 continue
-            self.case_name_list.append(case_dir.name)
+            case_name = os.path.basename(case_dir)
+            case_num = case_name[5:]
+            case_type = os.path.basename(os.path.split(case_dir)[0])
+            case_name = case_type + case_num
+            self.case_name_list.append(case_name)
 
             if self.norm_props:
                 normalize_physics_props(this_case_params)
             if self.norm_bc:
                 normalize_bc(this_case_params, "vel_top")
-            
+
             # Loop frames, get input-output pairs
             # Stop when converged
             early_converged = False

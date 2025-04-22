@@ -28,6 +28,7 @@ case_params = {
 }
 """
 
+import os
 from pathlib import Path
 from typing import Tuple, List, Dict, Any
 import random
@@ -282,7 +283,11 @@ class DamFlowAutoDataset(CfdAutoDataset):
             num_steps = len(outputs)
             if num_steps <= 0:
                 continue
-            self.case_name_list.append(case_dir.name)
+            case_name = os.path.basename(case_dir)
+            case_num = case_name[5:]
+            case_type = os.path.basename(os.path.split(case_dir)[0])
+            case_name = case_type + case_num
+            self.case_name_list.append(case_name)
             self.frame_num_list.append(num_steps)
 
             if self.norm_props:
