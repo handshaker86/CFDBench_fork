@@ -89,7 +89,7 @@ def get_result(result_dir: Path, data_pattern: str, model_pattern: str):
 
 def get_visualize_result(
     test_data: CavityFlowAutoDataset,
-    velocity_path: Path,
+    prediction_path: Path,
     data_to_visualize: str,
     is_autodeeponet: bool = False,
 ):
@@ -114,17 +114,19 @@ def get_visualize_result(
         u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
         v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
     else:
-        prediction_path = prediction_path / "test" / "preds.pt"
-        prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
-        u_prediction = prediction[: prediction.shape[0] // 2, :, :]
-        v_prediction = prediction[prediction.shape[0] // 2 :, :, :]
+        result_path = prediction_path / "test" / "preds.pt"
+        prediction = torch.load(result_path)  # prediction: (all_frames, h, w)
+        h, w = prediction.shape[1], prediction.shape[2]
+        prediction = prediction.reshape(-1, 2, h, w)
+        u_prediction = prediction[:, 0, :, :]  # u_prediction: (all_frames, h, w)
+        v_prediction = prediction[:, 1, :, :]  # v_prediction: (all_frames, h, w)
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
     assert u_real.shape == v_real.shape
     assert u_prediction.shape == v_prediction.shape
 
-    image_save_path = velocity_path / "visualize_result" / data_to_visualize
+    image_save_path = prediction_path / "visualize_result" / data_to_visualize
     image_save_path.mkdir(exist_ok=True, parents=True)
     generate_frame(
         u_real, v_real, u_prediction, v_prediction, image_save_path, dir_frame_range
@@ -171,8 +173,10 @@ def get_case_accuracy(
         prediction_path = prediction_path / "test" / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
         prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
-        u_prediction = prediction[: prediction.shape[0] // 2, :, :]
-        v_prediction = prediction[prediction.shape[0] // 2 :, :, :]
+        h, w = prediction.shape[1], prediction.shape[2]
+        prediction = prediction.reshape(-1, 2, h, w)
+        u_prediction = prediction[:, 0, :, :]  # u_prediction: (all_frames, h, w)
+        v_prediction = prediction[:, 1, :, :]  # v_prediction: (all_frames, h, w)
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
@@ -254,8 +258,10 @@ def cal_loss(
         prediction_path = prediction_path / "test" / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
         prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
-        u_prediction = prediction[: prediction.shape[0] // 2, :, :]
-        v_prediction = prediction[prediction.shape[0] // 2 :, :, :]
+        h, w = prediction.shape[1], prediction.shape[2]
+        prediction = prediction.reshape(-1, 2, h, w)
+        u_prediction = prediction[:, 0, :, :]  # u_prediction: (all_frames, h, w)
+        v_prediction = prediction[:, 1, :, :]  # v_prediction: (all_frames, h, w)
 
     u_real = test_data.labels[:, 0]  # u_real: (all_frames, h, w)
     v_real = test_data.labels[:, 1]  # v_real: (all_frames, h, w)
