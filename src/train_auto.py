@@ -91,6 +91,9 @@ def evaluate(
     with torch.inference_mode():
         for step, batch in enumerate(tqdm(loader)):
             # inputs, labels, case_params = batch
+            # inference warm-up
+            outputs: dict = model(**batch)
+
             start_time = time.time()
             inputs = batch["inputs"]  # (b, 2, h, w)
             labels = batch["label"]  # (b, 2, h, w)
@@ -344,18 +347,24 @@ def main():
         norm_props=bool(args.norm_props),
         norm_bc=bool(args.norm_bc),
     )
-    assert train_data is not None
-    assert dev_data is not None
-    assert test_data is not None
-    print(f"# train examples: {len(train_data)}")
-    print(f"# dev examples: {len(dev_data)}")
-    print(f"# test examples: {len(test_data)}")
+    del train_data, dev_data
+    import gc
+
+    gc.collect()
+    # assert train_data is not None
+    # assert dev_data is not None
+    # assert test_data is not None
+    # print(f"# train examples: {len(train_data)}")
+    # print(f"# dev examples: {len(dev_data)}")
+    # print(f"# test examples: {len(test_data)}")
 
     # Model
     print("Loading model")
     model = init_model(args)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"Model has {num_params} parameters")
+
+    # import pdb; pdb.set_trace()
 
     if "train" in args.mode:
         args.save(str(output_dir / "train_args.json"))
@@ -455,7 +464,9 @@ def main():
                     f"[Warning] {output_dir} not found, please run the test first"
                 )
         is_autodeeponet = args.model == "auto_deeponet"
-        get_visualize_result(test_data, output_dir, args.data_to_visualize,is_autodeeponet)
+        get_visualize_result(
+            test_data, output_dir, args.data_to_visualize, is_autodeeponet
+        )
 
 
 if __name__ == "__main__":
