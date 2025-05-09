@@ -400,7 +400,7 @@ def main():
             test_dir = output_dir / "robustness_test" / dir_name
         else:
             test_dir = output_dir / "test"
-        test_dir.mkdir(exist_ok=True)
+        test_dir.mkdir(parents=True, exist_ok=True)
 
         test(
             model,
@@ -430,10 +430,13 @@ def main():
         data_name = args.data_name
         if robustness_test:
             prefix = "robustness_test_"
+            test_dir_name = get_robustness_dir_name(args)
         else:
             prefix = ""
+            test_dir_name = ""
         result_save_path = Path(
-            prefix + f"results/time_step={time_step}/{model_name}/{data_name}"
+            prefix
+            + f"results/time_step={time_step}/{model_name}/{data_name}/{test_dir_name}"
         )
 
         # check if the results exists
