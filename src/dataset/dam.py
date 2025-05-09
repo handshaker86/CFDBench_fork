@@ -329,8 +329,8 @@ class DamFlowAutoDataset(CfdAutoDataset):
             # Stop when converged
 
             for i in range(num_steps):
-                inp = torch.tensor(inputs[i], dtype=torch.float32)  # (2, h, w)
-                out = torch.tensor(outputs[i], dtype=torch.float32)
+                inp = inputs[i]  # (2, h, w)
+                out = outputs[i]
 
                 assert not torch.isnan(inp).any()
                 assert not torch.isnan(out).any()

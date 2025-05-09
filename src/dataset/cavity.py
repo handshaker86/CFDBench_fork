@@ -342,8 +342,8 @@ class CavityFlowAutoDataset(CfdAutoDataset):
             # Stop when converged
             early_converged = False
             for i in range(num_steps):
-                inp = torch.tensor(inputs[i], dtype=torch.float32)  # (3, h, w)
-                out = torch.tensor(outputs[i], dtype=torch.float32)  # (3, h, w)
+                inp = inputs[i]  # (3, h, w)
+                out = outputs[i]  # (3, h, w)
 
                 # Check for convergence
                 inp_magn = torch.sqrt(inp[0] ** 2 + inp[1] ** 2)

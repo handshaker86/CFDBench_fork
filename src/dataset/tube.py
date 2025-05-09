@@ -286,8 +286,8 @@ class TubeFlowAutoDataset(CfdAutoDataset):
 
             early_converged = False
             for i in range(num_steps):
-                inp = torch.tensor(inputs[i], dtype=torch.float32)  # (2, h, w)
-                out = torch.tensor(outputs[i], dtype=torch.float32)
+                inp = inputs[i]  # (2, h, w)
+                out = outputs[i]
 
                 # Check for convergence
                 inp_magn = torch.sqrt(inp[0] ** 2 + inp[1] ** 2)
