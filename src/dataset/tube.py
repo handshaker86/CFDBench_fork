@@ -10,7 +10,12 @@ import numpy as np
 from tqdm import tqdm
 
 from .base import CfdDataset, CfdAutoDataset
-from .utils import load_json, normalize_bc, normalize_physics_props
+from .utils import (
+    load_json,
+    normalize_bc,
+    normalize_physics_props,
+    mask_and_noise_process,
+)
 
 
 def load_case_data(case_dir: Path) -> Tuple[np.ndarray, Dict[str, float]]:
@@ -180,6 +185,8 @@ class TubeFlowAutoDataset(CfdAutoDataset):
         norm_bc: bool,
         delta_time: float = 0.1,
         stable_state_diff: float = 0.001,
+        robustness_test: bool = False,
+        **kwargs,
     ):
         """
         Assume:
@@ -205,12 +212,13 @@ class TubeFlowAutoDataset(CfdAutoDataset):
         self.norm_bc = norm_bc
         self.delta_time = delta_time
         self.stable_state_diff = stable_state_diff
+        self.robustness_test = robustness_test
 
         # The difference between input and output in number of frames.
         self.time_step_size = int(self.delta_time / self.data_delta_time)
-        self.load_data(case_dirs, self.time_step_size)
+        self.load_data(case_dirs, self.time_step_size, **kwargs)
 
-    def load_data(self, case_dirs, time_step_size: int):
+    def load_data(self, case_dirs, time_step_size: int, **kwargs):
         """
         This will set the following attributes:
             self.case_dirs: List[Path]
@@ -231,9 +239,31 @@ class TubeFlowAutoDataset(CfdAutoDataset):
         # loop all cases
         for case_id, case_dir in enumerate(case_dirs):
             case_features, this_case_params = load_case_data(case_dir)  # (T, c, h, w)
-            inputs = case_features[:-time_step_size, :]  # (T, 3, h, w)
-            outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
+            case_features = torch.tensor(case_features, dtype=torch.float32)
             self.all_features.append(case_features)
+
+            if self.robustness_test:
+                mask_range = kwargs.get("mask_range", None)
+                noise_mode = kwargs.get("noise_mode", None)
+                noise_std = kwargs.get("noise_std", 0.0)
+                block_size = kwargs.get("block_size", 0)
+                num_blocks = kwargs.get("num_blocks", 0)
+                edge_width = kwargs.get("edge_width", 0)
+                processed_case_features = mask_and_noise_process(
+                    input_data=case_features,
+                    mask_range=mask_range,
+                    noise_mode=noise_mode,
+                    noise_mean=0.0,
+                    noise_std=noise_std,
+                    block_size=block_size,
+                    num_blocks=num_blocks,
+                    edge_width=edge_width,
+                )
+            else:
+                processed_case_features = case_features
+
+            inputs = processed_case_features[:-time_step_size, :]  # (T, 3, h, w)
+            outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
 
             self.case_params.append(this_case_params)
@@ -341,6 +371,8 @@ def get_tube_auto_datasets(
     delta_time: float = 0.1,
     stable_state_diff: float = 0.001,
     seed: int = 0,
+    robustness_test: bool = False,
+    **kwargs,
 ) -> Tuple[TubeFlowAutoDataset, TubeFlowAutoDataset, TubeFlowAutoDataset]:
     print(data_dir, subset_name)
     case_dirs = []
@@ -371,11 +403,15 @@ def get_tube_auto_datasets(
         f"test: {len(test_case_dirs)}"
     )
     print("=============================================")
-    kwargs: dict[str, Any] = dict(
-        delta_time=delta_time,
-        stable_state_diff=stable_state_diff,
-        norm_props=norm_props,
-        norm_bc=norm_bc,
+    kwargs: dict[str, Any] = (
+        dict(
+            delta_time=delta_time,
+            stable_state_diff=stable_state_diff,
+            norm_props=norm_props,
+            norm_bc=norm_bc,
+            robustness_test=robustness_test,
+        )
+        | kwargs
     )
     train_data = TubeFlowAutoDataset(train_case_dirs, **kwargs)
     dev_data = TubeFlowAutoDataset(dev_case_dirs, **kwargs)

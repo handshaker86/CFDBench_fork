@@ -12,10 +12,15 @@ import numpy as np
 
 if __name__ == "__main__":
     from base import CfdDataset, CfdAutoDataset
-    from utils import load_json, normalize_bc, normalize_physics_props  # type: ignore
+    from utils import load_json, normalize_bc, normalize_physics_props, mask_and_noise_process  # type: ignore
 else:
     from .base import CfdDataset, CfdAutoDataset
-    from .utils import load_json, normalize_bc, normalize_physics_props
+    from .utils import (
+        load_json,
+        normalize_bc,
+        normalize_physics_props,
+        mask_and_noise_process,
+    )
 
 
 def load_case_data(case_dir: Path) -> Tuple[np.ndarray, Dict[str, float]]:
@@ -221,6 +226,8 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
         cache_dir: Path,
         delta_time: float = 0.1,
         stable_state_diff: float = 0.001,
+        robustness_test: bool = False,
+        **kwargs,
     ):
         """
         Assume:
@@ -248,12 +255,13 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
         self.cache_dir = cache_dir / split
         self.delta_time = delta_time
         self.stable_state_diff = stable_state_diff
+        self.robustness_test = robustness_test
 
         # The difference between input and output in number of frames.
         self.time_step_size = int(self.delta_time / self.data_delta_time)
-        self.load_data(case_dirs, self.time_step_size)
+        self.load_data(case_dirs, self.time_step_size, **kwargs)
 
-    def load_data(self, case_dirs, time_step_size: int):
+    def load_data(self, case_dirs, time_step_size: int, **kwargs):
         """
         This will set the following attributes:
             self.case_dirs: List[Path]
@@ -287,8 +295,30 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
         # Loop cases to create features and labels
         for case_id, case_dir in enumerate(case_dirs):
             case_features, this_case_params = load_case_data(case_dir)  # (T, c, h, w)
+            case_features = torch.tensor(case_features, dtype=torch.float32)
             self.all_features.append(case_features)
-            inputs = case_features[:-time_step_size, :]  # (T, 3, h, w)
+
+            if self.robustness_test:
+                mask_range = kwargs.get("mask_range", None)
+                noise_mode = kwargs.get("noise_mode", None)
+                noise_std = kwargs.get("noise_std", 0.0)
+                block_size = kwargs.get("block_size", 0)
+                num_blocks = kwargs.get("num_blocks", 0)
+                edge_width = kwargs.get("edge_width", 0)
+                processed_case_features = mask_and_noise_process(
+                    input_data=case_features,
+                    mask_range=mask_range,
+                    noise_mode=noise_mode,
+                    noise_mean=0.0,
+                    noise_std=noise_std,
+                    block_size=block_size,
+                    num_blocks=num_blocks,
+                    edge_width=edge_width,
+                )
+            else:
+                processed_case_features = case_features
+
+            inputs = processed_case_features[:-time_step_size, :]  # (T, 3, h, w)
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
             assert len(inputs) == len(outputs)
 
@@ -428,6 +458,8 @@ def get_cylinder_auto_datasets(
     stable_state_diff: float = 0.001,
     seed: int = 0,
     load_splits: List[str] = ["train", "dev", "test"],
+    robustness_test: bool = False,
+    **kwargs,
 ) -> Tuple[
     Optional[CylinderFlowAutoDataset],
     Optional[CylinderFlowAutoDataset],
@@ -462,12 +494,16 @@ def get_cylinder_auto_datasets(
         f"test: {len(test_case_dirs)}"
     )
     print("=============================================")
-    kwargs: dict[str, Any] = dict(
-        delta_time=delta_time,
-        stable_state_diff=stable_state_diff,
-        norm_props=norm_props,
-        norm_bc=norm_bc,
-        cache_dir=Path("./dataset/cache/cylinder", subset_name),
+    kwargs: dict[str, Any] = (
+        dict(
+            delta_time=delta_time,
+            stable_state_diff=stable_state_diff,
+            norm_props=norm_props,
+            norm_bc=norm_bc,
+            cache_dir=Path("./dataset/cache/cylinder", subset_name),
+            robustness_test=robustness_test,
+        )
+        | kwargs
     )
     if "train" in load_splits:
         train_data = CylinderFlowAutoDataset(train_case_dirs, split="train", **kwargs)
