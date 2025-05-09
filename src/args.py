@@ -70,6 +70,22 @@ class Args(Tap):
     delta_time: float = 1.0
     """The time step size."""
 
+    # robustness_test parameters
+    robustness_test: bool = False
+    """Whether to run the robustness test."""
+    mask_range: str = "edge"
+    """One of 'global', 'edge'. Used to generate the mask for robustness test."""
+    noise_mode: str = "noise"
+    """One of 'noise', 'zero'. noise is to add noise to the input, zero is to set the parts of input to zero."""
+    noise_std: float = 0.1
+    """The standard deviation of the noise."""
+    edge_width: int = 1
+    """The width of the edge to mask."""
+    block_size: int = 0
+    """The size of the block to mask."""
+    num_blocks: int = 0
+    """The number of blocks to mask."""
+
     # FFN hyperparameters
     ffn_depth: int = 8
     ffn_width: int = 100
