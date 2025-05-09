@@ -23,6 +23,7 @@ from utils import (
     plot,
     plot_loss,
     get_output_dir,
+    get_robustness_dir_name,
     load_best_ckpt,
     plot_predictions,
     check_path_exists,
@@ -335,7 +336,17 @@ def main():
 
     output_dir = get_output_dir(args, is_auto=True)
     output_dir.mkdir(exist_ok=True, parents=True)
+    robustness_test = args.robustness_test
     args.save(str(output_dir / "args.json"))
+
+    kwargs = dict(
+        mask_range=args.mask_range,
+        noise_mode=args.noise_mode,
+        noise_std=args.noise_std,
+        edge_width=args.edge_width,
+        num_blocks=args.num_blocks,
+        block_size=args.block_size,
+    )
 
     # Data
     print("Loading data...")
@@ -346,25 +357,22 @@ def main():
         delta_time=args.delta_time,
         norm_props=bool(args.norm_props),
         norm_bc=bool(args.norm_bc),
+        robustness_test=robustness_test,
+        **kwargs,
     )
-    del train_data, dev_data
-    import gc
 
-    gc.collect()
-    # assert train_data is not None
-    # assert dev_data is not None
-    # assert test_data is not None
-    # print(f"# train examples: {len(train_data)}")
-    # print(f"# dev examples: {len(dev_data)}")
-    # print(f"# test examples: {len(test_data)}")
+    assert train_data is not None
+    assert dev_data is not None
+    assert test_data is not None
+    print(f"# train examples: {len(train_data)}")
+    print(f"# dev examples: {len(dev_data)}")
+    print(f"# test examples: {len(test_data)}")
 
     # Model
     print("Loading model")
     model = init_model(args)
     num_params = sum(p.numel() for p in model.parameters())
     print(f"Model has {num_params} parameters")
-
-    # import pdb; pdb.set_trace()
 
     if "train" in args.mode:
         args.save(str(output_dir / "train_args.json"))
@@ -382,15 +390,22 @@ def main():
             log_interval=args.log_interval,
         )
     if "test" in args.mode:
-        args.save(str(output_dir / "test_args.json"))
         # Test
+        args.save(str(output_dir / "test_args.json"))
         load_best_ckpt(model, output_dir)
-        test_dir = output_dir / "test"
+
+        # process test_dir
+        if robustness_test:
+            dir_name = get_robustness_dir_name(args)
+            test_dir = output_dir / "robustness_test" / dir_name
+        else:
+            test_dir = output_dir / "test"
         test_dir.mkdir(exist_ok=True)
+
         test(
             model,
             test_data,
-            output_dir / "test",
+            test_dir,
             batch_size=len(test_data),
             infer_steps=20,
             plot_interval=10,
@@ -413,8 +428,12 @@ def main():
         else:
             model_name = args.model
         data_name = args.data_name
+        if robustness_test:
+            prefix = "robustness_test_"
+        else:
+            prefix = ""
         result_save_path = Path(
-            f"results/time_step={time_step}/{model_name}/{data_name}"
+            prefix + f"results/time_step={time_step}/{model_name}/{data_name}"
         )
 
         # check if the results exists
@@ -436,9 +455,24 @@ def main():
                 )
 
         is_autodeeponet = args.model == "auto_deeponet"
-        get_case_accuracy(test_data, output_dir, result_save_path, is_autodeeponet)
-        cal_loss(test_data, output_dir, result_save_path, is_autodeeponet)
-        cal_predict_time(output_dir, result_save_path, is_autodeeponet)
+        get_case_accuracy(
+            test_data,
+            output_dir,
+            result_save_path,
+            args,
+            is_autodeeponet,
+            robustness_test,
+        )
+        cal_loss(
+            test_data,
+            output_dir,
+            result_save_path,
+            args,
+            is_autodeeponet,
+            robustness_test,
+        )
+        if not args.robustness_test:
+            cal_predict_time(output_dir, result_save_path, is_autodeeponet)
 
     # Visualize prediction
     if args.visualize:

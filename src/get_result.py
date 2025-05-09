@@ -1,9 +1,10 @@
 from pathlib import Path
+from args import Args
 
 import numpy as np
 import torch
 
-from utils import load_json, check_file_exists, generate_frame
+from utils import load_json, check_file_exists, generate_frame, get_robustness_dir_name
 from dataset.cavity import CavityFlowAutoDataset
 
 
@@ -160,17 +161,25 @@ def get_case_accuracy(
     test_data: CavityFlowAutoDataset,
     prediction_path: Path,
     result_save_path: Path,
+    args: Args,
     is_autodeeponet: bool = False,
+    robustness_test: bool = False,
 ):
+    if robustness_test:
+        robustness_test_dir = get_robustness_dir_name(args)
+        dir_name = "robustness_test/" + robustness_test_dir
+    else:
+        dir_name = "test"
+
     if is_autodeeponet:
-        u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
-        v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+        u_prediction_path = prediction_path / "u" / dir_name / "preds.pt"
+        v_prediction_path = prediction_path / "v" / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
 
         u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
         v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
     else:
-        prediction_path = prediction_path / "test" / "preds.pt"
+        prediction_path = prediction_path / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
         prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
         h, w = prediction.shape[1], prediction.shape[2]
@@ -245,17 +254,25 @@ def cal_loss(
     test_data: CavityFlowAutoDataset,
     prediction_path: Path,
     result_save_path: Path,
+    args: Args,
     is_autodeeponet: bool = False,
+    robustness_test: bool = False,
 ):
+    if robustness_test:
+        robustness_test_dir = get_robustness_dir_name(args)
+        dir_name = "robustness_test/" + robustness_test_dir
+    else:
+        dir_name = "test"
+
     if is_autodeeponet:
-        u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
-        v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+        u_prediction_path = prediction_path / "u" / dir_name / "preds.pt"
+        v_prediction_path = prediction_path / "v" / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
 
         u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
         v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
     else:
-        prediction_path = prediction_path / "test" / "preds.pt"
+        prediction_path = prediction_path / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
         prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
         h, w = prediction.shape[1], prediction.shape[2]
@@ -280,7 +297,9 @@ def cal_loss(
 
 
 def cal_predict_time(
-    prediction_path: Path, result_save_path: Path, is_autodeeponet: bool = False
+    prediction_path: Path,
+    result_save_path: Path,
+    is_autodeeponet: bool = False,
 ):
     if is_autodeeponet:
         u_prediction_time = prediction_path / "u" / "test" / "predict_time.txt"

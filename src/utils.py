@@ -294,6 +294,25 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
     return output_dir
 
 
+def get_robustness_dir_name(args: Args) -> Path:
+    suffix_parts = []
+    if args.noise_std is not None:
+        suffix_parts.append(f"ns={args.noise_std}")
+    if args.edge_width is not None:
+        suffix_parts.append(f"ew={args.edge_width}")
+    if args.block_size is not None:
+        suffix_parts.append(f"bs={args.block_size}")
+    if args.num_blocks is not None:
+        suffix_parts.append(f"nb={args.num_blocks}")
+    if args.mask_range:
+        suffix_parts.append(f"mask_{args.mask_range}")
+    if args.noise_mode:
+        suffix_parts.append(f"mode_{args.noise_mode}")
+    dir_name = "_".join(suffix_parts)
+
+    return dir_name
+
+
 def load_best_ckpt(model, output_dir: Path):
     print(f"Finding the best checkpoint from {output_dir}")
     best_ckpt_dir = get_best_ckpt(output_dir)

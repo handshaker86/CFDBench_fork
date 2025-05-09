@@ -67,6 +67,8 @@ def get_auto_dataset(
     norm_props: bool,
     norm_bc: bool,
     load_splits: list = ["train", "dev", "test"],
+    robustness_test: bool = False,
+    **kwargs,
 ) -> Tuple[
     Optional[CfdAutoDataset],
     Optional[CfdAutoDataset],
@@ -89,6 +91,8 @@ def get_auto_dataset(
             delta_time=delta_time,
             norm_props=norm_props,
             norm_bc=norm_bc,
+            robustness_test=robustness_test,
+            **kwargs,
         )
         return train_data, dev_data, test_data
     elif problem_name == "cavity":
@@ -98,6 +102,8 @@ def get_auto_dataset(
             norm_props=norm_props,
             norm_bc=norm_bc,
             delta_time=delta_time,
+            robustness_test=robustness_test,
+            **kwargs,
         )
         return train_data, dev_data, test_data
     elif problem_name == "dam":
@@ -107,6 +113,8 @@ def get_auto_dataset(
             norm_props=norm_props,
             norm_bc=norm_bc,
             delta_time=delta_time,
+            robustness_test=robustness_test,
+            **kwargs,
         )
         return train_data, dev_data, test_data
     elif problem_name == "cylinder":
@@ -117,6 +125,8 @@ def get_auto_dataset(
             norm_bc=norm_bc,
             delta_time=delta_time,
             load_splits=load_splits,
+            robustness_test=robustness_test,
+            **kwargs,
         )
         return train_data, dev_data, test_data
     else:
