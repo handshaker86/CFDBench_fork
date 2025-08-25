@@ -176,8 +176,8 @@ def get_case_accuracy(
         v_prediction_path = prediction_path / "v" / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
 
-        u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
-        v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+        u_prediction = torch.load(u_prediction_path, weights_only=True)  # u_prediction: (all_frames, h, w)
+        v_prediction = torch.load(v_prediction_path, weights_only=True)  # v_prediction: (all_frames, h, w)
     else:
         prediction_path = prediction_path / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
