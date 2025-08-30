@@ -82,6 +82,7 @@ def evaluate(
     input_scores = deepcopy(scores)
     all_preds: List[Tensor] = []
     inference_time = 0.0
+    compute_time = 0.0
     print("=== Evaluating ===")
     print(f"# examples: {len(data)}")
     print(f"Batch size: {batch_size}")
@@ -89,18 +90,29 @@ def evaluate(
     print(f"Plot interval: {plot_interval}")
     print(f"Output dir: {output_dir}")
     model.eval()
+
+    # inference warm up
+    print("Warming up GPU...")
+    with torch.inference_mode():
+        for _ in range(10):
+            batch = next(iter(loader))
+            _ = model(**batch)
+    torch.cuda.synchronize() 
+    print("GPU is ready!")
+
     with torch.inference_mode():
         for step, batch in enumerate(tqdm(loader)):
             # inputs, labels, case_params = batch
-            # inference warm-up
-            outputs: dict = model(**batch)
-
-            start_time = time.time()
+            torch.cuda.synchronize()
+            start_time = time.perf_counter()
             inputs = batch["inputs"]  # (b, 2, h, w)
             labels = batch["label"]  # (b, 2, h, w)
 
             # Compute the prediction
+            start_compute_time = time.perf_counter()
             outputs: dict = model(**batch)
+            torch.cuda.synchronize()
+            end_compute_time = time.perf_counter()
             loss: dict = outputs["loss"]
             preds: Tensor = outputs["preds"]
             height, width = inputs.shape[2:]
@@ -109,8 +121,10 @@ def evaluate(
             preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
             # preds = preds.repeat(1, 3, 1, 1)
             all_preds.append(preds.cpu().detach())
-            end_time = time.time()
+            torch.cuda.synchronize()
+            end_time = time.perf_counter()
             inference_time += end_time - start_time
+            compute_time += end_compute_time - start_compute_time
             # loss = model.loss_fn(labels=labels[:, :1], preds=preds)
 
             # Compute difference between the input and label
@@ -133,7 +147,10 @@ def evaluate(
                 )
     with open(output_dir / "predict_time.txt", "w") as f:
         f.write(f"Time taken for generating prediction: {inference_time}")
+    with open(output_dir / "compute_time.txt", "w") as f:
+        f.write(f"Time taken for model computation: {compute_time}")
     print(f"Predict has been saved to {output_dir/'predict_time.txt'}")
+    print(f"Computation time has been saved to {output_dir/'compute_time.txt'}")
 
     if measure_time:
         print("Memory usage:")
