@@ -112,11 +112,11 @@ def get_visualize_result(
     if is_autodeeponet:
         u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
         v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
-        u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
-        v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+        u_prediction = torch.load(u_prediction_path, weights_only=True)  # u_prediction: (all_frames, h, w)
+        v_prediction = torch.load(v_prediction_path, weights_only=True)  # v_prediction: (all_frames, h, w)
     else:
         result_path = prediction_path / "test" / "preds.pt"
-        prediction = torch.load(result_path)  # prediction: (all_frames, h, w)
+        prediction = torch.load(result_path, weights_only=True)  # prediction: (all_frames, h, w)
         h, w = prediction.shape[1], prediction.shape[2]
         prediction = prediction.reshape(-1, 2, h, w)
         u_prediction = prediction[:, 0, :, :]  # u_prediction: (all_frames, h, w)
@@ -181,7 +181,7 @@ def get_case_accuracy(
     else:
         prediction_path = prediction_path / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
-        prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
+        prediction = torch.load(prediction_path, weights_only=True)  # prediction: (all_frames, h, w)
         h, w = prediction.shape[1], prediction.shape[2]
         prediction = prediction.reshape(-1, 2, h, w)
         u_prediction = prediction[:, 0, :, :]  # u_prediction: (all_frames, h, w)
@@ -269,12 +269,12 @@ def cal_loss(
         v_prediction_path = prediction_path / "v" / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
 
-        u_prediction = torch.load(u_prediction_path)  # u_prediction: (all_frames, h, w)
-        v_prediction = torch.load(v_prediction_path)  # v_prediction: (all_frames, h, w)
+        u_prediction = torch.load(u_prediction_path, weights_only=True)  # u_prediction: (all_frames, h, w)
+        v_prediction = torch.load(v_prediction_path, weights_only=True)  # v_prediction: (all_frames, h, w)
     else:
         prediction_path = prediction_path / dir_name / "preds.pt"
         result_save_path.mkdir(exist_ok=True, parents=True)
-        prediction = torch.load(prediction_path)  # prediction: (all_frames, h, w)
+        prediction = torch.load(prediction_path, weights_only=True)  # prediction: (all_frames, h, w)
         h, w = prediction.shape[1], prediction.shape[2]
         prediction = prediction.reshape(-1, 2, h, w)
         u_prediction = prediction[:, 0, :, :]  # u_prediction: (all_frames, h, w)
@@ -296,42 +296,42 @@ def cal_loss(
     print(f"Loss saved in {result_save_path}")
 
 
-def cal_predict_time(
-    prediction_path: Path,
+def cal_time(
+    path: Path,
     result_save_path: Path,
     is_autodeeponet: bool = False,
+    type: str = "predict"   # "predict" or "compute"
 ):
     if is_autodeeponet:
-        u_prediction_time = prediction_path / "u" / "test" / "predict_time.txt"
-        v_prediction_time = prediction_path / "v" / "test" / "predict_time.txt"
+        u_time_file = path / "u" / "test" / f"{type}_time.txt"
+        v_time_file = path / "v" / "test" / f"{type}_time.txt"
 
-        with open(u_prediction_time, "r") as f:
-            u_predict_time = 0.0
+        with open(u_time_file, "r") as f:
+            u_time = 0.0
             line = f.readline()
             colon_index = line.find(":")
-            u_predict_time = float(line[colon_index + 1 :].strip())
+            u_time = float(line[colon_index + 1 :].strip())
 
-        with open(v_prediction_time, "r") as f:
-            v_predict_time = 0.0
+        with open(v_time_file, "r") as f:
+            v_time = 0.0
             line = f.readline()
             colon_index = line.find(":")
-            v_predict_time = float(line[colon_index + 1 :].strip())
+            v_time = float(line[colon_index + 1 :].strip())
 
-        predict_time = u_predict_time + v_predict_time
+        time = u_time + v_time
 
     else:
-        prediction_path = prediction_path / "test" / "predict_time.txt"
-        with open(prediction_path, "r") as f:
-            predict_time = 0.0
+        file_path = path / "test" / f"{type}_time.txt"
+        with open(file_path, "r") as f:
+            time = 0.0
             line = f.readline()
             colon_index = line.find(":")
-            predict_time = float(line[colon_index + 1 :].strip())
+            time = float(line[colon_index + 1 :].strip())
 
-    with open(result_save_path / "predict_time.txt", "w") as f:
-        f.write(f"Total predict_time: {predict_time}")
+    with open(result_save_path / f"{type}_time.txt", "w") as f:
+        f.write(f"Total {type}_time: {time}")
 
-    print(f"Predict time saved in {result_save_path}")
-
+    print(f"{type} time saved in {result_save_path}")
 
 if __name__ == "__main__":
     result_dir = Path("result/auto")
