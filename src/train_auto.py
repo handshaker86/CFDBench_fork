@@ -70,10 +70,10 @@ def evaluate(
     output_dir: Path,
     batch_size: int = 2,
     plot_interval: int = 1,
-    measure_time: bool = False,
+    measure_time: bool = True,
+    warmup_runs: int = 5,
+    average_runs: int = 10,
 ):
-    if measure_time:
-        assert batch_size == 1
 
     loader = DataLoader(
         data, batch_size=batch_size, shuffle=False, collate_fn=collate_fn
@@ -81,8 +81,8 @@ def evaluate(
     scores = {name: [] for name in model.loss_fn.get_score_names()}
     input_scores = deepcopy(scores)
     all_preds: List[Tensor] = []
-    inference_time = 0.0
-    compute_time = 0.0
+    all_run_times: List[float] = []
+
     print("=== Evaluating ===")
     print(f"# examples: {len(data)}")
     print(f"Batch size: {batch_size}")
@@ -94,71 +94,93 @@ def evaluate(
     # inference warm up
     print("Warming up GPU...")
     with torch.inference_mode():
-        for _ in range(10):
-            batch = next(iter(loader))
+        it = iter(loader)
+        for _ in range(warmup_runs):
+            try:
+                batch = next(it)
+            except StopIteration:
+                if len(data) == 0:
+                    print("Warning: Empty dataset, skipping warmup.")
+                    break
+                it = iter(loader)
+                batch = next(it)
             _ = model(**batch)
-    torch.cuda.synchronize() 
+    torch.cuda.synchronize()
     print("GPU is ready!")
 
-    with torch.inference_mode():
-        for step, batch in enumerate(tqdm(loader)):
-            # inputs, labels, case_params = batch
-            torch.cuda.synchronize()
-            start_time = time.perf_counter()
-            inputs = batch["inputs"]  # (b, 2, h, w)
-            labels = batch["label"]  # (b, 2, h, w)
+    for run_idx in range(average_runs):
 
-            # Compute the prediction
-            start_compute_time = time.perf_counter()
-            outputs: dict = model(**batch)
-            torch.cuda.synchronize()
-            end_compute_time = time.perf_counter()
-            loss: dict = outputs["loss"]
-            preds: Tensor = outputs["preds"]
-            height, width = inputs.shape[2:]
+        is_collecting_run = (
+            run_idx == 0
+        )  # Only the first run collects scores and predictions
+        if is_collecting_run:
+            # Reset collectors
+            scores = {name: [] for name in model.loss_fn.get_score_names()}
+            input_scores = deepcopy(scores)
+            all_preds = []
 
-            # When using DeepONetAuto, the prediction is a flattened.
-            preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
-            # preds = preds.repeat(1, 3, 1, 1)
-            all_preds.append(preds.cpu().detach())
-            torch.cuda.synchronize()
-            end_time = time.perf_counter()
-            inference_time += end_time - start_time
-            compute_time += end_compute_time - start_compute_time
-            # loss = model.loss_fn(labels=labels[:, :1], preds=preds)
+        current_run_total_time = 0.0
 
-            # Compute difference between the input and label
-            input_loss: dict = model.loss_fn(labels=labels[:, :1], preds=inputs[:, :1])
-            for key in input_scores:
-                input_scores[key].append(input_loss[key].cpu().tolist())
-            for key in scores:
-                scores[key].append(loss[key].cpu().tolist())
+        with torch.inference_mode():
+            for step, batch in enumerate(tqdm(loader)):
+                torch.cuda.synchronize()
+                start_time = time.perf_counter()
 
-            if step % plot_interval == 0 and not measure_time:
-                # Dump input, label and prediction flow images.
-                image_dir = output_dir / "images"
-                image_dir.mkdir(exist_ok=True, parents=True)
-                plot_predictions(
-                    inp=inputs[0][0],
-                    label=labels[0][0],
-                    pred=preds[0][0],
-                    out_dir=image_dir,
-                    step=step,
-                )
+                inputs = batch["inputs"]  # (b, 2, h, w)
+                labels = batch["label"]  # (b, 2, h, w)
+
+                # Compute the prediction
+                outputs: dict = model(**batch)
+                torch.cuda.synchronize()
+                loss: dict = outputs["loss"]
+                preds: Tensor = outputs["preds"]
+                height, width = inputs.shape[2:]
+                preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
+                preds_cpu = preds.cpu().detach()
+                if is_collecting_run:
+                    all_preds.append(preds_cpu)
+
+                torch.cuda.synchronize()
+                end_time = time.perf_counter()
+                current_run_total_time += end_time - start_time
+
+                if is_collecting_run:
+                    # loss = model.loss_fn(labels=labels[:, :1], preds=preds)
+
+                    # Compute difference between the input and label
+                    input_loss: dict = model.loss_fn(
+                        labels=labels[:, :1], preds=inputs[:, :1]
+                    )
+                    for key in input_scores:
+                        input_scores[key].append(input_loss[key].cpu().tolist())
+                    for key in scores:
+                        scores[key].append(loss[key].cpu().tolist())
+
+                    # if step % plot_interval == 0 and not measure_time:
+                    # # Dump input, label and prediction flow images.
+                    #     image_dir = output_dir / "images"
+                    #     image_dir.mkdir(exist_ok=True, parents=True)
+                    #     plot_predictions(
+                    #         inp=inputs[0][0],
+                    #         label=labels[0][0],
+                    #         pred=preds[0][0],
+                    #         out_dir=image_dir,
+                    #         step=step,
+                    #     )
+
+            all_run_times.append(current_run_total_time)
+
+    if not all_run_times:
+        inference_time = 0.0
+    elif measure_time:
+        inference_time = sum(all_run_times) / len(all_run_times)
+    else:
+        inference_time = all_run_times[0]
+
     with open(output_dir / "predict_time.txt", "w") as f:
         f.write(f"Time taken for generating prediction: {inference_time}")
-    with open(output_dir / "compute_time.txt", "w") as f:
-        f.write(f"Time taken for model computation: {compute_time}")
-    print(f"Predict has been saved to {output_dir/'predict_time.txt'}")
-    print(f"Computation time has been saved to {output_dir/'compute_time.txt'}")
 
-    if measure_time:
-        print("Memory usage:")
-        print(torch.cuda.memory_summary("cuda"))
-        print("Time usage:")
-        time_per_step = 1000 * (end_time - start_time) / len(loader)
-        print(f"Time (ms) per step: {time_per_step:.3f}")
-        exit()
+    print(f"Predict time has been saved to {output_dir/'predict_time.txt'}")
 
     avg_scores = {}
     for key in scores:
@@ -186,7 +208,7 @@ def test(
     infer_steps: int = 200,
     plot_interval: int = 10,
     batch_size: int = 1,
-    measure_time: bool = False,
+    measure_time: bool = True,
 ):
     assert infer_steps > 0
     assert plot_interval > 0
@@ -222,7 +244,7 @@ def train(
     eval_batch_size: int = 2,
     log_interval: int = 10,
     eval_interval: int = 2,
-    measure_time: bool = False,
+    measure_time: bool = True,
 ):
     """
     Main function for training.
@@ -234,7 +256,7 @@ def train(
     - output_dir
     ...
     - log_interval: log loss, learning rate etc. every `log_interval` steps.
-    - measure_time: if `True`, will only run one epoch and print the time.
+    - measure_time: if `True`, will only run several epochs and save average time.
     """
     train_start_time = time.time()
     train_loader = DataLoader(
