@@ -34,7 +34,7 @@ from get_result import (
     get_visualize_result,
     get_case_accuracy,
     cal_loss,
-    cal_predict_time,
+    cal_time,
 )
 
 
@@ -514,7 +514,8 @@ def main():
             robustness_test,
         )
         if not args.robustness_test:
-            cal_predict_time(output_dir, result_save_path, is_autodeeponet)
+            cal_time(output_dir, result_save_path, is_autodeeponet, type="predict")
+            cal_time(output_dir, result_save_path, is_autodeeponet, type="compute")
 
     # Visualize prediction
     if args.visualize:

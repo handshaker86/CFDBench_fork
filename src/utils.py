@@ -213,7 +213,7 @@ def get_best_ckpt(output_dir: Path) -> Union[Path, None]:
 
 def load_ckpt(model, ckpt_path: Path) -> None:
     print(f"Loading checkpoint from {ckpt_path}")
-    model.load_state_dict(torch.load(ckpt_path, map_location="cpu"))
+    model.load_state_dict(torch.load(ckpt_path, map_location="cpu", weights_only=True))
 
 
 def get_output_dir(args: Args, is_auto: bool = False) -> Path:
