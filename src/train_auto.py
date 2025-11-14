@@ -515,7 +515,6 @@ def main():
         )
         if not args.robustness_test:
             cal_time(output_dir, result_save_path, is_autodeeponet, type="predict")
-            cal_time(output_dir, result_save_path, is_autodeeponet, type="compute")
 
     # Visualize prediction
     if args.visualize:
