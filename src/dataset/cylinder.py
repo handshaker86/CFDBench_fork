@@ -325,7 +325,7 @@ class CylinderFlowAutoDataset(CfdAutoDataset):
             self.case_params.append(this_case_params)
             num_steps = len(outputs)
             if num_steps <= 0:
-                print(f"Case {case_dir.name} has no steps")
+                # print(f"Case {case_dir.name} has no steps")
                 continue
             case_name = os.path.basename(case_dir)
             case_num = case_name[5:]
@@ -483,10 +483,11 @@ def get_cylinder_auto_datasets(
     # Split into train, dev, test
     num_cases = len(case_dirs)
     num_train = int(num_cases * 0.8)
-    num_dev = int(num_cases * 0.15)
+    num_dev = int(num_cases * 0.05)
+    num_test = int(num_cases * 0.05)
     train_case_dirs = case_dirs[:num_train]
     dev_case_dirs = case_dirs[num_train : num_train + num_dev]
-    test_case_dirs = case_dirs[num_train + num_dev :]
+    test_case_dirs = case_dirs[-num_test:]
     print("==== Number of cases in different splits ====")
     print(
         f"train: {len(train_case_dirs)}, "

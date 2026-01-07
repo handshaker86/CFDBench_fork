@@ -457,8 +457,8 @@ def get_cavity_auto_datasets(
 
     # Split into train, dev, test
     num_cases = len(case_dirs)
-    num_train = round(num_cases * 0.8)
-    num_dev = round(num_cases * 0.1)
+    num_train = int(num_cases * 0.8)
+    num_dev = int(num_cases * 0.1)
     train_case_dirs = case_dirs[:num_train]
     dev_case_dirs = case_dirs[num_train : num_train + num_dev]
     test_case_dirs = case_dirs[num_train + num_dev :]
