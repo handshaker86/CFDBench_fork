@@ -7,6 +7,7 @@ from models.auto_edeeponet import AutoEDeepONet
 from models.auto_deeponet_cnn import AutoDeepONetCnn
 from models.fno.fno2d import Fno2d
 from models.auto_ffn import AutoFfn
+from models.cno2d import Cno2d
 from models.loss import loss_name_to_fn
 from args import Args
 
@@ -117,6 +118,18 @@ def init_model(args: Args) -> AutoCfdModel:
             hidden_dim=args.fno_hidden_dim,  # Hid. dim. in the temporal domain
             modes1=args.fno_modes_x,
             modes2=args.fno_modes_y,
+        ).cuda()
+        return model
+    elif args.model == "cno":
+        model = Cno2d(
+            in_chan=args.in_chan,
+            out_chan=args.out_chan,
+            n_case_params=n_case_params,
+            loss_fn=loss_fn,
+            num_layers=args.cno_depth,
+            hidden_dim=args.cno_hidden_dim,
+            kernel_size=args.cno_kernel_size,
+            padding=args.cno_padding,
         ).cuda()
         return model
     else:

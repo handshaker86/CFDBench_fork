@@ -278,6 +278,14 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         )
     elif args.model == "auto_deeponet_cnn":
         dir_name = f"lr{args.lr}" f"_depth{args.autoffn_depth}"
+    elif args.model == "cno":
+        dir_name = (
+            f"lr{args.lr}"
+            + f"_d{args.cno_depth}"
+            + f"_h{args.cno_hidden_dim}"
+            + f"_k{args.cno_kernel_size}"
+            + f"_p{args.cno_padding}"
+        )
     elif args.model == "ffn":
         dir_name = f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
     else:

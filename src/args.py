@@ -73,7 +73,7 @@ class Args(Tap):
     """Number of columns in the lattice that represents the field."""
     # The time interval between two time step is 0.1s except for the cylinder task.
     # For the cylinder task, it is 0.001s.
-    delta_time: float = 0.01
+    delta_time: float = 1
     """The time step size."""
 
     # robustness_test parameters
@@ -121,6 +121,12 @@ class Args(Tap):
     fno_modes_x: int = 12
     fno_modes_y: int = 12
 
+    # CNO hyperparameters
+    cno_depth: int = 6
+    cno_hidden_dim: int = 64
+    cno_kernel_size: int = 5
+    cno_padding: int = 2
+
     # UNet
     unet_dim: int = 12
     unet_insert_case_params_at: str = "input"
@@ -135,4 +141,14 @@ class Args(Tap):
 def is_args_valid(args: Args):
     assert any(key in args.data_name for key in ["poiseuille", "cavity", "karman"])
     assert args.batch_size > 0
-    assert args.model in ["deeponet", "unet", "fno", "resnet"]
+    assert args.model in [
+        "deeponet",
+        "unet",
+        "fno",
+        "resnet",
+        "cno",
+        "auto_ffn",
+        "auto_deeponet",
+        "auto_edeeponet",
+        "auto_deeponet_cnn",
+    ]
