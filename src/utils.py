@@ -324,7 +324,7 @@ def get_robustness_dir_name(args: Args) -> Path:
 def load_best_ckpt(model, output_dir: Path):
     print(f"Finding the best checkpoint from {output_dir}")
     best_ckpt_dir = get_best_ckpt(output_dir)
-    assert best_ckpt_dir is not None
+    assert best_ckpt_dir is not None, f"Best checkpoint directory not found in {output_dir}"
     print(f"Loading best checkpoint from {best_ckpt_dir}")
     ckpt_path = best_ckpt_dir / "model.pt"
     load_ckpt(model, ckpt_path)

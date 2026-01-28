@@ -71,7 +71,7 @@ def evaluate(
     output_dir: Path,
     batch_size: int = 2,
     plot_interval: int = 1,
-    measure_time: bool = True,
+    measure_time: bool = False,
     warmup_runs: int = 5,
     average_runs: int = 10,
 ):
@@ -209,7 +209,7 @@ def test(
     infer_steps: int = 200,
     plot_interval: int = 10,
     batch_size: int = 1,
-    measure_time: bool = True,
+    measure_time: bool = False,
 ):
     assert infer_steps > 0
     assert plot_interval > 0
@@ -245,7 +245,7 @@ def train(
     eval_batch_size: int = 2,
     log_interval: int = 10,
     eval_interval: int = 2,
-    measure_time: bool = True,
+    measure_time: bool = False,
 ):
     """
     Main function for training.
@@ -428,6 +428,8 @@ def main():
             eval_batch_size=args.eval_batch_size,
             eval_interval=args.eval_interval,
             log_interval=args.log_interval,
+            # Training should not exit early unless explicitly requested.
+            measure_time=False,
         )
     if "test" in args.mode:
         # Test
