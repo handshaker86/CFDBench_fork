@@ -35,6 +35,7 @@ from get_result import (
     get_case_accuracy,
     cal_loss,
     cal_time,
+    measure_predict_time,
 )
 
 
@@ -518,31 +519,203 @@ def main():
 
     # Visualize prediction
     if args.visualize:
-        # init output_dir
         if args.model == "auto_deeponet":
-            output_dir = output_dir.parent
+            # Temporarily set velocity_dim to get base directory, then remove u/v
+            visualize_output_dir = get_output_dir(args, is_auto=True)
+            # Remove u or v from path (get_output_dir adds it based on velocity_dim)
+            if visualize_output_dir.name in ["u", "v"]:
+                visualize_output_dir = visualize_output_dir.parent
+        else:
+            visualize_output_dir = get_output_dir(args, is_auto=True)
+        
+        # Handle robustness_test path
+        if robustness_test:
+            dir_name = get_robustness_dir_name(args)
+            if args.model == "auto_deeponet":
+                u_result_path = Path(visualize_output_dir / "u" / "robustness_test" / dir_name)
+                v_result_path = Path(visualize_output_dir / "v" / "robustness_test" / dir_name)
+            else:
+                result_path = Path(visualize_output_dir / "robustness_test" / dir_name)
+        else:
+            if args.model == "auto_deeponet":
+                u_result_path = Path(visualize_output_dir / "u" / "test")
+                v_result_path = Path(visualize_output_dir / "v" / "test")
+            else:
+                result_path = Path(visualize_output_dir / "test")
 
         # check if the results exists
         if args.model == "auto_deeponet":
-            u_result_path = Path(output_dir / "u")
-            v_result_path = Path(output_dir / "v")
             if not check_path_exists(u_result_path):
                 raise FileNotFoundError(
-                    f"[Warning] u velocity results in {output_dir} not found, please run the test first"
+                    f"[Warning] u velocity results in {u_result_path} not found, please run the test first"
                 )
             elif not check_path_exists(v_result_path):
                 raise FileNotFoundError(
-                    f"[Warning] v velocity results in {output_dir} not found, please run the test first"
+                    f"[Warning] v velocity results in {v_result_path} not found, please run the test first"
                 )
         else:
-            if not check_path_exists(output_dir):
+            if not check_path_exists(result_path):
                 raise FileNotFoundError(
-                    f"[Warning] {output_dir} not found, please run the test first"
+                    f"[Warning] {result_path} not found, please run the test first"
                 )
         is_autodeeponet = args.model == "auto_deeponet"
         get_visualize_result(
-            test_data, output_dir, args.data_to_visualize, is_autodeeponet
+            test_data, visualize_output_dir, args.data_to_visualize, is_autodeeponet, robustness_test, args
         )
+
+    # Measure prediction time
+    if args.measure_predict_time:
+        print("=== Measuring Prediction Time ===")
+        num_frames = args.measure_predict_num_frames
+        is_autodeeponet = args.model == "auto_deeponet"
+
+        if is_autodeeponet:
+            # For auto_deeponet, measure u and v separately
+            output_dir_parent = (
+                output_dir.parent if output_dir.name in ["u", "v"] else output_dir
+            )
+
+            # Measure u model time
+            print("Measuring u model prediction time...")
+            args_u = deepcopy(args)
+            args_u.velocity_dim = 0
+            model_u = init_model(args_u)
+            output_dir_u = get_output_dir(args_u, is_auto=True)
+            if "test" not in args.mode:
+                load_best_ckpt(model_u, output_dir_u)
+            avg_time_u = measure_predict_time(
+                model=model_u,
+                dataset=test_data,
+                num_frames=num_frames,
+                num_runs=10,
+                warmup_runs=5,
+                batch_size=num_frames,
+            )
+
+            # Measure v model time
+            print("Measuring v model prediction time...")
+            args_v = deepcopy(args)
+            args_v.velocity_dim = 1
+            model_v = init_model(args_v)
+            output_dir_v = get_output_dir(args_v, is_auto=True)
+            if "test" not in args.mode:
+                load_best_ckpt(model_v, output_dir_v)
+            avg_time_v = measure_predict_time(
+                model=model_v,
+                dataset=test_data,
+                num_frames=num_frames,
+                num_runs=10,
+                warmup_runs=5,
+                batch_size=num_frames,
+            )
+
+            # Total time is sum of u and v
+            avg_time = avg_time_u + avg_time_v
+
+            # Save results
+            if robustness_test:
+                dir_name = get_robustness_dir_name(args)
+                result_save_path_u = output_dir_u / "robustness_test" / dir_name
+                result_save_path_v = output_dir_v / "robustness_test" / dir_name
+                result_save_path = output_dir_parent / "robustness_test" / dir_name
+            else:
+                result_save_path_u = output_dir_u / "test"
+                result_save_path_v = output_dir_v / "test"
+                result_save_path = output_dir_parent / "test"
+
+            result_save_path_u.mkdir(exist_ok=True, parents=True)
+            result_save_path_v.mkdir(exist_ok=True, parents=True)
+            result_save_path.mkdir(exist_ok=True, parents=True)
+
+            with open(result_save_path_u / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time_u:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time_u / num_frames:.6f}s\n")
+
+            with open(result_save_path_v / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time_v:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time_v / num_frames:.6f}s\n")
+
+            with open(result_save_path / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+                f.write(f"u model time: {avg_time_u:.4f}s\n")
+                f.write(f"v model time: {avg_time_v:.4f}s\n")
+
+            # Save final result to benchmark directory
+            if len(args.model.split("_")) > 1:
+                model_name = args.model.split("_")[1]
+            else:
+                model_name = args.model
+            data_name = args.data_name
+            benchmark_path = Path(f"results/benchmark/{model_name}/{data_name}")
+            benchmark_path.mkdir(exist_ok=True, parents=True)
+            with open(benchmark_path / "prediction_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+                f.write(f"u model time: {avg_time_u:.4f}s\n")
+                f.write(f"v model time: {avg_time_v:.4f}s\n")
+
+            print(
+                f"Prediction time measurement saved to {result_save_path / 'measure_predict_time.txt'}"
+            )
+            print(
+                f"Final benchmark result saved to {benchmark_path / 'prediction_time.txt'}"
+            )
+        else:
+            # For other models, measure normally
+            if "test" not in args.mode:
+                load_best_ckpt(model, output_dir)
+
+            avg_time = measure_predict_time(
+                model=model,
+                dataset=test_data,
+                num_frames=num_frames,
+                num_runs=10,
+                warmup_runs=5,
+                batch_size=num_frames,
+            )
+
+            # Save result
+            if robustness_test:
+                dir_name = get_robustness_dir_name(args)
+                result_save_path = output_dir / "robustness_test" / dir_name
+            else:
+                result_save_path = output_dir / "test"
+            result_save_path.mkdir(exist_ok=True, parents=True)
+            with open(result_save_path / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+
+            # Save final result to benchmark directory
+            if len(args.model.split("_")) > 1:
+                model_name = args.model.split("_")[1]
+            else:
+                model_name = args.model
+            data_name = args.data_name
+            benchmark_path = Path(f"results/benchmark/{model_name}/{data_name}")
+            benchmark_path.mkdir(exist_ok=True, parents=True)
+            with open(benchmark_path / "prediction_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+
+            print(
+                f"Prediction time measurement saved to {result_save_path / 'measure_predict_time.txt'}"
+            )
+            print(
+                f"Final benchmark result saved to {benchmark_path / 'prediction_time.txt'}"
+            )
 
 
 if __name__ == "__main__":
