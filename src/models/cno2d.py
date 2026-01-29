@@ -79,7 +79,9 @@ class Cno2d(AutoCfdModel):
         self.num_layers = num_layers
         self.hidden_dim = hidden_dim
         self.kernel_size = kernel_size
-        self.padding = padding
+        # Keep spatial shapes stable across residual blocks.
+        # For stride=1, "same" padding is p=(k-1)//2.
+        self.padding = (kernel_size - 1) // 2
 
         self.act_fn = nn.GELU()
 
@@ -93,7 +95,7 @@ class Cno2d(AutoCfdModel):
                 CnoBlock(
                     dim=hidden_dim,
                     kernel_size=kernel_size,
-                    padding=padding,
+                    padding=self.padding,
                     act_fn=self.act_fn,
                 )
             )
