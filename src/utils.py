@@ -286,6 +286,15 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
             + f"_k{args.cno_kernel_size}"
             + f"_p{args.cno_padding}"
         )
+    elif args.model == "uno":
+        dir_name = (
+            f"lr{args.lr}"
+            + f"_bd{args.uno_base_dim}"
+            + f"_lv{args.uno_levels}"
+            + f"_dpl{args.uno_depth_per_level}"
+            + f"_btd{args.uno_bottleneck_depth}"
+            + f"_k{args.uno_kernel_size}"
+        )
     elif args.model == "ffn":
         dir_name = f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
     else:

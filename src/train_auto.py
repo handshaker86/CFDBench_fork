@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Optional
 import time
 from shutil import copyfile
 from copy import deepcopy
@@ -20,6 +20,7 @@ from models.auto_deeponet_cnn import AutoDeepONetCnn
 from models.auto_ffn import AutoFfn
 from utils import (
     dump_json,
+    load_json,
     plot,
     plot_loss,
     get_output_dir,
@@ -63,6 +64,118 @@ def collate_fn(batch: list):
         mask=mask.cuda(),
         case_params=case_params.cuda(),
     )
+
+
+def _parse_int_list(csv: str) -> List[int]:
+    parts = [p.strip() for p in csv.split(",") if p.strip() != ""]
+    return [int(p) for p in parts]
+
+
+def _read_best_dev_nmse_from_run(run_dir: Path) -> float:
+    best = float("inf")
+    for ckpt_dir in sorted(run_dir.glob("ckpt-*")):
+        scores_path = ckpt_dir / "scores.json"
+        if not scores_path.exists():
+            continue
+        scores = load_json(scores_path)
+        dev_loss = scores.get("dev_loss", None)
+        if dev_loss is None:
+            continue
+        best = min(best, float(dev_loss))
+    return best
+
+
+def _sweep_cno_and_pick_best(
+    args: Args,
+    train_data: CfdAutoDataset,
+    dev_data: CfdAutoDataset,
+    base_output_dir: Path,
+) -> Tuple[int, int, int, List[dict]]:
+    """
+    Tiny CNO sweep that reuses already-loaded datasets.
+
+    Returns: (best_depth, best_hidden_dim, best_kernel_size, all_results)
+    """
+    assert args.model == "cno"
+    depths = _parse_int_list(args.cno_sweep_depths)
+    hiddens = _parse_int_list(args.cno_sweep_hidden_dims)
+    kernels = _parse_int_list(args.cno_sweep_kernel_sizes)
+    assert depths and hiddens and kernels
+
+    sweep_dir = base_output_dir / "sweep"
+    sweep_dir.mkdir(parents=True, exist_ok=True)
+
+    results: List[dict] = []
+    best_cfg: Optional[Tuple[int, int, int]] = None
+    best_dev_nmse: float = float("inf")
+
+    print("=== CNO tiny sweep (reusing loaded data) ===")
+    print(f"Sweep epochs per config: {args.cno_sweep_epochs}")
+    print(f"depths={depths}, hidden_dims={hiddens}, kernel_sizes={kernels}")
+    print("Default-like config included (if in grid): d=6,h=64,k=5")
+
+    # For sweep speed: only evaluate once per config (at the end).
+    # This avoids paying for repeated dev passes while still letting us
+    # rank configs by a consistent dev metric.
+    sweep_eval_interval = max(1, args.cno_sweep_epochs)
+
+    for hidden_dim in hiddens:
+        for depth in depths:
+            for kernel_size in kernels:
+                sweep_args = deepcopy(args)
+                sweep_args.cno_hidden_dim = hidden_dim
+                sweep_args.cno_depth = depth
+                sweep_args.cno_kernel_size = kernel_size
+                # Ensure spatial shapes stay consistent for residual blocks:
+                # for stride=1, use "same" padding p=(k-1)//2.
+                sweep_args.cno_padding = (kernel_size - 1) // 2
+
+                cfg_name = (
+                    f"lr{sweep_args.lr}_d{depth}_h{hidden_dim}_k{kernel_size}_p{sweep_args.cno_padding}"
+                )
+                cfg_out = sweep_dir / cfg_name
+                cfg_out.mkdir(parents=True, exist_ok=True)
+                sweep_args.save(str(cfg_out / "args.json"))
+
+                model = init_model(sweep_args)
+                train(
+                    model=model,
+                    train_data=train_data,
+                    dev_data=dev_data,
+                    output_dir=cfg_out,
+                    num_epochs=sweep_args.cno_sweep_epochs,
+                    lr=sweep_args.lr,
+                    lr_step_size=sweep_args.lr_step_size,
+                    batch_size=sweep_args.batch_size,
+                    eval_batch_size=sweep_args.eval_batch_size,
+                    eval_interval=sweep_eval_interval,
+                    log_interval=sweep_args.log_interval,
+                    measure_time=False,
+                )
+
+                cfg_best = _read_best_dev_nmse_from_run(cfg_out)
+                rec = dict(
+                    depth=depth,
+                    hidden_dim=hidden_dim,
+                    kernel_size=kernel_size,
+                    padding=sweep_args.cno_padding,
+                    best_dev_nmse=cfg_best,
+                    out_dir=str(cfg_out),
+                )
+                results.append(rec)
+                print(f"[sweep] {cfg_name}: best_dev_nmse={cfg_best}")
+
+                if cfg_best < best_dev_nmse:
+                    best_dev_nmse = cfg_best
+                    best_cfg = (depth, hidden_dim, kernel_size)
+
+    assert best_cfg is not None
+    best_depth, best_hidden, best_kernel = best_cfg
+    print("=== CNO sweep done ===")
+    print(
+        f"Best (proxy) config: depth={best_depth}, hidden_dim={best_hidden}, kernel={best_kernel}, dev_nmse={best_dev_nmse}"
+    )
+    return best_depth, best_hidden, best_kernel, results
 
 
 def evaluate(
@@ -408,7 +521,33 @@ def main():
     print(f"# dev examples: {len(dev_data)}")
     print(f"# test examples: {len(test_data)}")
 
-    # Model
+    # Model (optionally sweep CNO hyperparams first, without reloading data)
+    if args.model == "cno" and args.cno_sweep and "train" in args.mode:
+        best_d, best_h, best_k, sweep_results = _sweep_cno_and_pick_best(
+            args=args,
+            train_data=train_data,
+            dev_data=dev_data,
+            base_output_dir=output_dir,
+        )
+        sweep_out = output_dir / "sweep"
+        dump_json(sweep_results, sweep_out / "sweep_results.json")
+        dump_json(
+            dict(
+                best=dict(
+                    cno_depth=best_d,
+                    cno_hidden_dim=best_h,
+                    cno_kernel_size=best_k,
+                    cno_padding=args.cno_padding,
+                )
+            ),
+            sweep_out / "best_config.json",
+        )
+        # Stick to the selected config for the main run
+        args.cno_depth = best_d
+        args.cno_hidden_dim = best_h
+        args.cno_kernel_size = best_k
+        args.cno_padding = (best_k - 1) // 2
+
     print("Loading model")
     model = init_model(args)
     num_params = sum(p.numel() for p in model.parameters())
@@ -448,7 +587,9 @@ def main():
             model,
             test_data,
             test_dir,
-            batch_size=len(test_data),
+            # NOTE: Using the full test set as a single batch can easily OOM.
+            # Use eval_batch_size to keep memory bounded.
+            batch_size=args.eval_batch_size,
             infer_steps=20,
             plot_interval=10,
         )
