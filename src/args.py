@@ -23,7 +23,7 @@ class Args(Tap):
 
     model: str = "auto_deeponet"
     """
-    For autoregressive modeling (`train_auto.py`), it must be one of: ['auto_ffn', 'auto_deeponet', 'auto_edeeponet', 'auto_deeponet_cnn', 'unet', 'fno', 'resnet'],
+    For autoregressive modeling (`train_auto.py`), it must be one of: ['auto_ffn', 'auto_deeponet', 'auto_edeeponet', 'auto_deeponet_cnn', 'unet', 'fno', 'cno', 'uno', 'resnet'],
     for non-autoregressive modeling (`train.py`), it must be one of: ['ffn', 'deeponet'].
     """
     in_chan: int = 2
@@ -34,7 +34,7 @@ class Args(Tap):
     batch_size: int = 128
     eval_batch_size: int = 16
 
-    velocity_dim: int = 0
+    velocity_dim: int = 1
     """
     Choose the velocity dimension for training and evaluation. 
     0 for u (horizontal velocity), 1 for v (vertical velocity).
@@ -61,7 +61,7 @@ class Args(Tap):
     on the subset of laminar task with varying geometry and physical
     properties.
     """
-    data_dir: str = "../cfdbench_dataset"
+    data_dir: str = "data/cfdbench_dataset"
     """The directory that contains the CFDBench."""
     norm_props: int = 1
     """Whether to normalize the physical properties."""
@@ -121,6 +121,31 @@ class Args(Tap):
     fno_modes_x: int = 12
     fno_modes_y: int = 12
 
+    # CNO hyperparameters
+    cno_depth: int = 6
+    cno_hidden_dim: int = 64
+    cno_kernel_size: int = 5
+    cno_padding: int = 2
+
+    # U-NO hyperparameters
+    uno_base_dim: int = 64
+    uno_levels: int = 4
+    uno_depth_per_level: int = 2
+    uno_bottleneck_depth: int = 4
+    uno_kernel_size: int = 5
+
+    # CNO tiny sweep (in-process, avoids repeated data loading)
+    cno_sweep: bool = False
+    """If True and model=='cno', run a tiny hyperparameter sweep before full training."""
+    cno_sweep_epochs: int = 5
+    """Number of epochs to train each sweep config (proxy training)."""
+    cno_sweep_depths: str = "4,6,8"
+    """Comma-separated list of depths to sweep, e.g. '4,6,8'."""
+    cno_sweep_hidden_dims: str = "64,96,128"
+    """Comma-separated list of hidden dims to sweep, e.g. '64,96,128'."""
+    cno_sweep_kernel_sizes: str = "3,5"
+    """Comma-separated list of kernel sizes to sweep, e.g. '3,5'."""
+
     # UNet
     unet_dim: int = 12
     unet_insert_case_params_at: str = "input"
@@ -135,4 +160,15 @@ class Args(Tap):
 def is_args_valid(args: Args):
     assert any(key in args.data_name for key in ["poiseuille", "cavity", "karman"])
     assert args.batch_size > 0
-    assert args.model in ["deeponet", "unet", "fno", "resnet"]
+    assert args.model in [
+        "deeponet",
+        "unet",
+        "fno",
+        "resnet",
+        "cno",
+        "uno",
+        "auto_ffn",
+        "auto_deeponet",
+        "auto_edeeponet",
+        "auto_deeponet_cnn",
+    ]

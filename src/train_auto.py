@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import List, Tuple, Optional
 import time
 from shutil import copyfile
 from copy import deepcopy
@@ -20,6 +20,7 @@ from models.auto_deeponet_cnn import AutoDeepONetCnn
 from models.auto_ffn import AutoFfn
 from utils import (
     dump_json,
+    load_json,
     plot,
     plot_loss,
     get_output_dir,
@@ -35,6 +36,7 @@ from get_result import (
     get_case_accuracy,
     cal_loss,
     cal_time,
+    measure_predict_time,
 )
 
 
@@ -64,13 +66,125 @@ def collate_fn(batch: list):
     )
 
 
+def _parse_int_list(csv: str) -> List[int]:
+    parts = [p.strip() for p in csv.split(",") if p.strip() != ""]
+    return [int(p) for p in parts]
+
+
+def _read_best_dev_nmse_from_run(run_dir: Path) -> float:
+    best = float("inf")
+    for ckpt_dir in sorted(run_dir.glob("ckpt-*")):
+        scores_path = ckpt_dir / "scores.json"
+        if not scores_path.exists():
+            continue
+        scores = load_json(scores_path)
+        dev_loss = scores.get("dev_loss", None)
+        if dev_loss is None:
+            continue
+        best = min(best, float(dev_loss))
+    return best
+
+
+def _sweep_cno_and_pick_best(
+    args: Args,
+    train_data: CfdAutoDataset,
+    dev_data: CfdAutoDataset,
+    base_output_dir: Path,
+) -> Tuple[int, int, int, List[dict]]:
+    """
+    Tiny CNO sweep that reuses already-loaded datasets.
+
+    Returns: (best_depth, best_hidden_dim, best_kernel_size, all_results)
+    """
+    assert args.model == "cno"
+    depths = _parse_int_list(args.cno_sweep_depths)
+    hiddens = _parse_int_list(args.cno_sweep_hidden_dims)
+    kernels = _parse_int_list(args.cno_sweep_kernel_sizes)
+    assert depths and hiddens and kernels
+
+    sweep_dir = base_output_dir / "sweep"
+    sweep_dir.mkdir(parents=True, exist_ok=True)
+
+    results: List[dict] = []
+    best_cfg: Optional[Tuple[int, int, int]] = None
+    best_dev_nmse: float = float("inf")
+
+    print("=== CNO tiny sweep (reusing loaded data) ===")
+    print(f"Sweep epochs per config: {args.cno_sweep_epochs}")
+    print(f"depths={depths}, hidden_dims={hiddens}, kernel_sizes={kernels}")
+    print("Default-like config included (if in grid): d=6,h=64,k=5")
+
+    # For sweep speed: only evaluate once per config (at the end).
+    # This avoids paying for repeated dev passes while still letting us
+    # rank configs by a consistent dev metric.
+    sweep_eval_interval = max(1, args.cno_sweep_epochs)
+
+    for hidden_dim in hiddens:
+        for depth in depths:
+            for kernel_size in kernels:
+                sweep_args = deepcopy(args)
+                sweep_args.cno_hidden_dim = hidden_dim
+                sweep_args.cno_depth = depth
+                sweep_args.cno_kernel_size = kernel_size
+                # Ensure spatial shapes stay consistent for residual blocks:
+                # for stride=1, use "same" padding p=(k-1)//2.
+                sweep_args.cno_padding = (kernel_size - 1) // 2
+
+                cfg_name = (
+                    f"lr{sweep_args.lr}_d{depth}_h{hidden_dim}_k{kernel_size}_p{sweep_args.cno_padding}"
+                )
+                cfg_out = sweep_dir / cfg_name
+                cfg_out.mkdir(parents=True, exist_ok=True)
+                sweep_args.save(str(cfg_out / "args.json"))
+
+                model = init_model(sweep_args)
+                train(
+                    model=model,
+                    train_data=train_data,
+                    dev_data=dev_data,
+                    output_dir=cfg_out,
+                    num_epochs=sweep_args.cno_sweep_epochs,
+                    lr=sweep_args.lr,
+                    lr_step_size=sweep_args.lr_step_size,
+                    batch_size=sweep_args.batch_size,
+                    eval_batch_size=sweep_args.eval_batch_size,
+                    eval_interval=sweep_eval_interval,
+                    log_interval=sweep_args.log_interval,
+                    measure_time=False,
+                )
+
+                cfg_best = _read_best_dev_nmse_from_run(cfg_out)
+                rec = dict(
+                    depth=depth,
+                    hidden_dim=hidden_dim,
+                    kernel_size=kernel_size,
+                    padding=sweep_args.cno_padding,
+                    best_dev_nmse=cfg_best,
+                    out_dir=str(cfg_out),
+                )
+                results.append(rec)
+                print(f"[sweep] {cfg_name}: best_dev_nmse={cfg_best}")
+
+                if cfg_best < best_dev_nmse:
+                    best_dev_nmse = cfg_best
+                    best_cfg = (depth, hidden_dim, kernel_size)
+
+    assert best_cfg is not None
+    best_depth, best_hidden, best_kernel = best_cfg
+    print("=== CNO sweep done ===")
+    print(
+        f"Best (proxy) config: depth={best_depth}, hidden_dim={best_hidden}, kernel={best_kernel}, dev_nmse={best_dev_nmse}"
+    )
+    return best_depth, best_hidden, best_kernel, results
+
+
 def evaluate(
     model: AutoCfdModel,
     data: CfdAutoDataset,
     output_dir: Path,
     batch_size: int = 2,
     plot_interval: int = 1,
-    measure_time: bool = True,
+    measure_time: bool = False,
     warmup_runs: int = 5,
     average_runs: int = 10,
 ):
@@ -208,7 +322,7 @@ def test(
     infer_steps: int = 200,
     plot_interval: int = 10,
     batch_size: int = 1,
-    measure_time: bool = True,
+    measure_time: bool = False,
 ):
     assert infer_steps > 0
     assert plot_interval > 0
@@ -244,7 +358,7 @@ def train(
     eval_batch_size: int = 2,
     log_interval: int = 10,
     eval_interval: int = 2,
-    measure_time: bool = True,
+    measure_time: bool = False,
 ):
     """
     Main function for training.
@@ -407,7 +521,33 @@ def main():
     print(f"# dev examples: {len(dev_data)}")
     print(f"# test examples: {len(test_data)}")
 
-    # Model
+    # Model (optionally sweep CNO hyperparams first, without reloading data)
+    if args.model == "cno" and args.cno_sweep and "train" in args.mode:
+        best_d, best_h, best_k, sweep_results = _sweep_cno_and_pick_best(
+            args=args,
+            train_data=train_data,
+            dev_data=dev_data,
+            base_output_dir=output_dir,
+        )
+        sweep_out = output_dir / "sweep"
+        dump_json(sweep_results, sweep_out / "sweep_results.json")
+        dump_json(
+            dict(
+                best=dict(
+                    cno_depth=best_d,
+                    cno_hidden_dim=best_h,
+                    cno_kernel_size=best_k,
+                    cno_padding=args.cno_padding,
+                )
+            ),
+            sweep_out / "best_config.json",
+        )
+        # Stick to the selected config for the main run
+        args.cno_depth = best_d
+        args.cno_hidden_dim = best_h
+        args.cno_kernel_size = best_k
+        args.cno_padding = (best_k - 1) // 2
+
     print("Loading model")
     model = init_model(args)
     num_params = sum(p.numel() for p in model.parameters())
@@ -427,6 +567,8 @@ def main():
             eval_batch_size=args.eval_batch_size,
             eval_interval=args.eval_interval,
             log_interval=args.log_interval,
+            # Training should not exit early unless explicitly requested.
+            measure_time=False,
         )
     if "test" in args.mode:
         # Test
@@ -445,7 +587,9 @@ def main():
             model,
             test_data,
             test_dir,
-            batch_size=len(test_data),
+            # NOTE: Using the full test set as a single batch can easily OOM.
+            # Use eval_batch_size to keep memory bounded.
+            batch_size=args.eval_batch_size,
             infer_steps=20,
             plot_interval=10,
         )
@@ -518,31 +662,203 @@ def main():
 
     # Visualize prediction
     if args.visualize:
-        # init output_dir
         if args.model == "auto_deeponet":
-            output_dir = output_dir.parent
+            # Temporarily set velocity_dim to get base directory, then remove u/v
+            visualize_output_dir = get_output_dir(args, is_auto=True)
+            # Remove u or v from path (get_output_dir adds it based on velocity_dim)
+            if visualize_output_dir.name in ["u", "v"]:
+                visualize_output_dir = visualize_output_dir.parent
+        else:
+            visualize_output_dir = get_output_dir(args, is_auto=True)
+        
+        # Handle robustness_test path
+        if robustness_test:
+            dir_name = get_robustness_dir_name(args)
+            if args.model == "auto_deeponet":
+                u_result_path = Path(visualize_output_dir / "u" / "robustness_test" / dir_name)
+                v_result_path = Path(visualize_output_dir / "v" / "robustness_test" / dir_name)
+            else:
+                result_path = Path(visualize_output_dir / "robustness_test" / dir_name)
+        else:
+            if args.model == "auto_deeponet":
+                u_result_path = Path(visualize_output_dir / "u" / "test")
+                v_result_path = Path(visualize_output_dir / "v" / "test")
+            else:
+                result_path = Path(visualize_output_dir / "test")
 
         # check if the results exists
         if args.model == "auto_deeponet":
-            u_result_path = Path(output_dir / "u")
-            v_result_path = Path(output_dir / "v")
             if not check_path_exists(u_result_path):
                 raise FileNotFoundError(
-                    f"[Warning] u velocity results in {output_dir} not found, please run the test first"
+                    f"[Warning] u velocity results in {u_result_path} not found, please run the test first"
                 )
             elif not check_path_exists(v_result_path):
                 raise FileNotFoundError(
-                    f"[Warning] v velocity results in {output_dir} not found, please run the test first"
+                    f"[Warning] v velocity results in {v_result_path} not found, please run the test first"
                 )
         else:
-            if not check_path_exists(output_dir):
+            if not check_path_exists(result_path):
                 raise FileNotFoundError(
-                    f"[Warning] {output_dir} not found, please run the test first"
+                    f"[Warning] {result_path} not found, please run the test first"
                 )
         is_autodeeponet = args.model == "auto_deeponet"
         get_visualize_result(
-            test_data, output_dir, args.data_to_visualize, is_autodeeponet
+            test_data, visualize_output_dir, args.data_to_visualize, is_autodeeponet, robustness_test, args
         )
+
+    # Measure prediction time
+    if args.measure_predict_time:
+        print("=== Measuring Prediction Time ===")
+        num_frames = args.measure_predict_num_frames
+        is_autodeeponet = args.model == "auto_deeponet"
+
+        if is_autodeeponet:
+            # For auto_deeponet, measure u and v separately
+            output_dir_parent = (
+                output_dir.parent if output_dir.name in ["u", "v"] else output_dir
+            )
+
+            # Measure u model time
+            print("Measuring u model prediction time...")
+            args_u = deepcopy(args)
+            args_u.velocity_dim = 0
+            model_u = init_model(args_u)
+            output_dir_u = get_output_dir(args_u, is_auto=True)
+            if "test" not in args.mode:
+                load_best_ckpt(model_u, output_dir_u)
+            avg_time_u = measure_predict_time(
+                model=model_u,
+                dataset=test_data,
+                num_frames=num_frames,
+                num_runs=10,
+                warmup_runs=5,
+                batch_size=num_frames,
+            )
+
+            # Measure v model time
+            print("Measuring v model prediction time...")
+            args_v = deepcopy(args)
+            args_v.velocity_dim = 1
+            model_v = init_model(args_v)
+            output_dir_v = get_output_dir(args_v, is_auto=True)
+            if "test" not in args.mode:
+                load_best_ckpt(model_v, output_dir_v)
+            avg_time_v = measure_predict_time(
+                model=model_v,
+                dataset=test_data,
+                num_frames=num_frames,
+                num_runs=10,
+                warmup_runs=5,
+                batch_size=num_frames,
+            )
+
+            # Total time is sum of u and v
+            avg_time = avg_time_u + avg_time_v
+
+            # Save results
+            if robustness_test:
+                dir_name = get_robustness_dir_name(args)
+                result_save_path_u = output_dir_u / "robustness_test" / dir_name
+                result_save_path_v = output_dir_v / "robustness_test" / dir_name
+                result_save_path = output_dir_parent / "robustness_test" / dir_name
+            else:
+                result_save_path_u = output_dir_u / "test"
+                result_save_path_v = output_dir_v / "test"
+                result_save_path = output_dir_parent / "test"
+
+            result_save_path_u.mkdir(exist_ok=True, parents=True)
+            result_save_path_v.mkdir(exist_ok=True, parents=True)
+            result_save_path.mkdir(exist_ok=True, parents=True)
+
+            with open(result_save_path_u / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time_u:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time_u / num_frames:.6f}s\n")
+
+            with open(result_save_path_v / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time_v:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time_v / num_frames:.6f}s\n")
+
+            with open(result_save_path / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+                f.write(f"u model time: {avg_time_u:.4f}s\n")
+                f.write(f"v model time: {avg_time_v:.4f}s\n")
+
+            # Save final result to benchmark directory
+            if len(args.model.split("_")) > 1:
+                model_name = args.model.split("_")[1]
+            else:
+                model_name = args.model
+            data_name = args.data_name
+            benchmark_path = Path(f"results/benchmark/{model_name}/{data_name}")
+            benchmark_path.mkdir(exist_ok=True, parents=True)
+            with open(benchmark_path / "prediction_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+                f.write(f"u model time: {avg_time_u:.4f}s\n")
+                f.write(f"v model time: {avg_time_v:.4f}s\n")
+
+            print(
+                f"Prediction time measurement saved to {result_save_path / 'measure_predict_time.txt'}"
+            )
+            print(
+                f"Final benchmark result saved to {benchmark_path / 'prediction_time.txt'}"
+            )
+        else:
+            # For other models, measure normally
+            if "test" not in args.mode:
+                load_best_ckpt(model, output_dir)
+
+            avg_time = measure_predict_time(
+                model=model,
+                dataset=test_data,
+                num_frames=num_frames,
+                num_runs=10,
+                warmup_runs=5,
+                batch_size=num_frames,
+            )
+
+            # Save result
+            if robustness_test:
+                dir_name = get_robustness_dir_name(args)
+                result_save_path = output_dir / "robustness_test" / dir_name
+            else:
+                result_save_path = output_dir / "test"
+            result_save_path.mkdir(exist_ok=True, parents=True)
+            with open(result_save_path / "measure_predict_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+
+            # Save final result to benchmark directory
+            if len(args.model.split("_")) > 1:
+                model_name = args.model.split("_")[1]
+            else:
+                model_name = args.model
+            data_name = args.data_name
+            benchmark_path = Path(f"results/benchmark/{model_name}/{data_name}")
+            benchmark_path.mkdir(exist_ok=True, parents=True)
+            with open(benchmark_path / "prediction_time.txt", "w") as f:
+                f.write(
+                    f"Average prediction time for {num_frames} frames: {avg_time:.4f}s\n"
+                )
+                f.write(f"Time per frame: {avg_time / num_frames:.6f}s\n")
+
+            print(
+                f"Prediction time measurement saved to {result_save_path / 'measure_predict_time.txt'}"
+            )
+            print(
+                f"Final benchmark result saved to {benchmark_path / 'prediction_time.txt'}"
+            )
 
 
 if __name__ == "__main__":

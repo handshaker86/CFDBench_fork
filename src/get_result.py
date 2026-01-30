@@ -1,11 +1,17 @@
 from pathlib import Path
 from args import Args
+import time
 
 import numpy as np
 import torch
+from torch import Tensor
+from torch.utils.data import DataLoader
+from tqdm import tqdm
 
 from utils import load_json, check_file_exists, generate_frame, get_robustness_dir_name
 from dataset.cavity import CavityFlowAutoDataset
+from dataset.base import CfdAutoDataset
+from models.base_model import AutoCfdModel
 
 
 def get_dev_losses(output_dir: Path):
@@ -93,6 +99,8 @@ def get_visualize_result(
     prediction_path: Path,
     data_to_visualize: str,
     is_autodeeponet: bool = False,
+    if_robustness_test: bool = False,
+    args: Args = None,
 ):
     count = 0
     dir_frame_range = []
@@ -109,9 +117,20 @@ def get_visualize_result(
 
     print("Getting visualing result...")
 
+    # Determine the directory name based on robustness_test
+    if if_robustness_test and args is not None:
+        robustness_test_dir = get_robustness_dir_name(args)
+        # Build path properly using Path components instead of string concatenation
+        robustness_test_path = Path("robustness_test") / robustness_test_dir
+    else:
+        robustness_test_path = Path("test")
+
     if is_autodeeponet:
-        u_prediction_path = prediction_path / "u" / "test" / "preds.pt"
-        v_prediction_path = prediction_path / "v" / "test" / "preds.pt"
+        u_prediction_path = prediction_path / "u" / robustness_test_path / "preds.pt"
+        v_prediction_path = prediction_path / "v" / robustness_test_path / "preds.pt"
+        print(f"Loading predictions from:")
+        print(f"  u: {u_prediction_path}")
+        print(f"  v: {v_prediction_path}")
         u_prediction = torch.load(
             u_prediction_path, weights_only=True
         )  # u_prediction: (all_frames, h, w)
@@ -119,7 +138,12 @@ def get_visualize_result(
             v_prediction_path, weights_only=True
         )  # v_prediction: (all_frames, h, w)
     else:
-        result_path = prediction_path / "test" / "preds.pt"
+        result_path = prediction_path / robustness_test_path / "preds.pt"
+        print(f"Loading predictions from: {result_path}")
+        print(f"  prediction_path: {prediction_path}")
+        print(f"  robustness_test_path: {robustness_test_path}")
+        if args is not None:
+            print(f"  model: {args.model}")
         prediction = torch.load(
             result_path, weights_only=True
         )  # prediction: (all_frames, h, w)
@@ -135,8 +159,13 @@ def get_visualize_result(
 
     image_save_path = prediction_path / "visualize_result" / data_to_visualize
     image_save_path.mkdir(exist_ok=True, parents=True)
+    # Get model name from args
+    if args is not None:
+        model_name = args.model
+    else:
+        model_name = "model"
     generate_frame(
-        u_real, v_real, u_prediction, v_prediction, image_save_path, dir_frame_range
+        u_real, v_real, u_prediction, v_prediction, image_save_path, dir_frame_range, model_name=model_name
     )
 
     print("Getting visualing result finished.")
@@ -235,31 +264,91 @@ def get_case_accuracy(
     print(f"Case accuracy saved in {result_save_path}")
 
 
-def calculate_metrics(y_true, y_pred):
+def compute_vorticity(u, v, dx=1.0, dy=1.0):
     """
-    y_true: Tensor of shape (n, c, h, w), true values
-    y_pred: Tensor of shape (n, c, h, w), predicted values
+    Compute vorticity field (curl of velocity).
     """
-    # RMSE (Root Mean Squared Error) over all dimensions
-    rmse_mat = torch.sqrt(torch.mean((y_true - y_pred) ** 2, dim=(-1, -2)))
-    rmse = torch.mean(rmse_mat)
+    dv_dx = np.gradient(v, axis=-1, edge_order=2) / dx
+    du_dy = np.gradient(u, axis=-2, edge_order=2) / dy
+    return dv_dx - du_dy
 
-    # Normalized RMSE (nRMSE)
-    range_y = torch.amax(y_true, dim=(-1, -2)) - torch.amin(y_true, dim=(-1, -2))
-    mean_y = torch.mean(y_true, dim=(-1, -2))
-    nrmse_range = torch.mean(rmse_mat / range_y)
-    nrmse_mean = torch.mean(rmse_mat / mean_y)
 
-    # Maximum Error
-    max_err_mat = torch.amax(torch.abs(y_true - y_pred), dim=(-1, -2))
-    max_error = torch.mean(max_err_mat)
+def compute_divergence(u, v, dx=1.0, dy=1.0):
+    """
+    Compute divergence field.
+    """
+    du_dx = np.gradient(u, axis=-1, edge_order=2) / dx
+    dv_dy = np.gradient(v, axis=-2, edge_order=2) / dy
+    return du_dx + dv_dy
 
-    return {
-        "RMSE": rmse.item(),
-        "nRMSE (range)": nrmse_range.item(),
-        "nRMSE (mean)": nrmse_mean.item(),
-        "Max Error": max_error.item(),
-    }
+
+def calculate_metrics(y_true, y_pred, dx=1.0, dy=1.0):
+    """
+    Compute Reviewer-Proof metrics for flow fields.
+    y_true, y_pred: ndarray of shape (n, c, h, w)
+    """
+    if isinstance(y_true, torch.Tensor):
+        y_true = y_true.detach().cpu().numpy()
+    if isinstance(y_pred, torch.Tensor):
+        y_pred = y_pred.detach().cpu().numpy()
+
+    n, c, h, w = y_true.shape
+    epsilon = 1e-8
+    metrics = {}
+
+    # RMSE 
+    # Baseline metric for absolute pixel-wise accuracy.
+    # Calculated globally to avoid sample-size bias.
+    rmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
+    metrics["RMSE"] = rmse
+
+    # Global Relative L2 Error 
+    # We use the Norm of Difference / Norm of True (Global Aggregation).
+    diff_norm = np.linalg.norm(y_true - y_pred)
+    true_norm = np.linalg.norm(y_true)
+    rel_l2 = diff_norm / (true_norm + epsilon)
+    metrics["Rel L2 Error"] = rel_l2
+
+    # Spectral Error (Log Spectral Distance) 
+    # Measures the preservation of high-frequency details (texture/turbulence).
+    # 2D FFT over spatial dimensions (-2, -1)
+    fft_true = np.fft.fft2(y_true, axes=(-2, -1))
+    fft_pred = np.fft.fft2(y_pred, axes=(-2, -1))
+
+    # Use Log magnitude to balance high/low frequency contribution
+    log_true = np.log(np.abs(fft_true) + epsilon)
+    log_pred = np.log(np.abs(fft_pred) + epsilon)
+
+    # RMSE of the log spectra
+    spectral_error = np.sqrt(np.mean((log_true - log_pred) ** 2))
+    metrics["Spectral Error"] = spectral_error
+
+    # Only applicable if we have both u and v components (c >= 2)
+    if c >= 2:
+        u_true, v_true = y_true[:, 0], y_true[:, 1]
+        u_pred, v_pred = y_pred[:, 0], y_pred[:, 1]
+
+        # Relative Vorticity Error (Global)
+        # Checks if the model captures the rotational dynamics (eddies) correctly.
+        vor_true = compute_vorticity(u_true, v_true, dx, dy)
+        vor_pred = compute_vorticity(u_pred, v_pred, dx, dy)
+
+        vor_diff_norm = np.linalg.norm(vor_true - vor_pred)
+        vor_true_norm = np.linalg.norm(vor_true)
+
+        rel_vor_error = vor_diff_norm / (vor_true_norm + epsilon)
+        metrics["Rel Vorticity Error"] = rel_vor_error
+
+        # Divergence Consistency Error (RMSE)
+        # Instead of assuming div=0, we check if pred matches ground truth divergence.
+        div_true = compute_divergence(u_true, v_true, dx, dy)
+        div_pred = compute_divergence(u_pred, v_pred, dx, dy)
+
+        # RMSE of divergence difference
+        div_error = np.sqrt(np.mean((div_true - div_pred) ** 2))
+        metrics["Div Error"] = div_error
+
+    return metrics
 
 
 def cal_loss(
@@ -350,6 +439,121 @@ def cal_time(
         f.write(f"Total {type}_time: {time}")
 
     print(f"{type} time saved in {result_save_path}")
+
+
+def collate_fn(batch: list):
+    # Collate function for DataLoader
+    inputs, labels, case_params = zip(*batch)
+    inputs = torch.stack(inputs)  # (b, 3, h, w)
+    labels = torch.stack(labels)  # (b, 3, h, w)
+    labels = labels[:, :-1]  # (b, 2, h, w)
+    mask = inputs[:, -1:]  # (b, 1, h, w)
+    inputs = inputs[:, :-1]  # (b, 2, h, w)
+    keys = [x for x in case_params[0].keys() if x not in ["rotated", "dx", "dy"]]
+    case_params_vec = []
+    for case_param in case_params:
+        case_params_vec.append([case_param[k] for k in keys])
+    case_params = torch.tensor(case_params_vec)  # (b, 5)
+    return dict(
+        inputs=inputs.cuda(),
+        label=labels.cuda(),
+        mask=mask.cuda(),
+        case_params=case_params.cuda(),
+    )
+
+
+def measure_predict_time(
+    model: AutoCfdModel,
+    dataset: CfdAutoDataset,
+    num_frames: int = 200,
+    num_runs: int = 10,
+    warmup_runs: int = 5,
+    batch_size: int = 1,
+) -> float:
+    """
+    Measure prediction time for specified number of frames.
+    Only predicts first num_frames, runs multiple times and returns average time.
+
+    Args:
+        model: Model to use for prediction
+        dataset: Dataset to predict on
+        num_frames: Number of frames to predict (default: 200)
+        num_runs: Number of runs for averaging (default: 10)
+        warmup_runs: Number of warmup runs (default: 5)
+        batch_size: Batch size for prediction (default: 1)
+
+    Returns:
+        Average prediction time in seconds
+    """
+    # Limit dataset to first num_frames
+    limited_dataset = torch.utils.data.Subset(
+        dataset, range(min(num_frames, len(dataset)))
+    )
+    loader = DataLoader(
+        limited_dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn
+    )
+
+    model.eval()
+    all_run_times: list[float] = []
+
+    print("=== Measuring Prediction Time ===")
+    print(f"# examples: {len(limited_dataset)}")
+    print(f"Batch size: {batch_size}")
+    print(f"# batches: {len(loader)}")
+
+    # Warmup runs
+    print("Warming up GPU...")
+    with torch.inference_mode():
+        it = iter(loader)
+        for _ in range(warmup_runs):
+            try:
+                batch = next(it)
+            except StopIteration:
+                if len(limited_dataset) == 0:
+                    print("Warning: Empty dataset, skipping warmup.")
+                    break
+                it = iter(loader)
+                batch = next(it)
+            _ = model(**batch)
+    torch.cuda.synchronize()
+    print("GPU is ready!")
+
+    # Measure time over multiple runs
+    for run_idx in range(num_runs):
+        current_run_total_time = 0.0
+
+        with torch.inference_mode():
+            for step, batch in enumerate(
+                tqdm(loader, desc=f"Run {run_idx + 1}/{num_runs}")
+            ):
+                torch.cuda.synchronize()
+                start_time = time.perf_counter()
+
+                inputs = batch["inputs"]  # (b, 2, h, w)
+                labels = batch["label"]  # (b, 2, h, w)
+
+                # Compute the prediction
+                outputs: dict = model(**batch)
+                loss: dict = outputs["loss"]
+                preds: Tensor = outputs["preds"]
+                height, width = inputs.shape[2:]
+                preds = preds.view(-1, 1, height, width)  # (b, 1, h, w)
+                preds_cpu = preds.cpu().detach()
+
+                torch.cuda.synchronize()
+                end_time = time.perf_counter()
+                current_run_total_time += end_time - start_time
+
+        all_run_times.append(current_run_total_time)
+        print(f"Run {run_idx + 1}/{num_runs}: {current_run_total_time:.4f}s")
+
+    if not all_run_times:
+        inference_time = 0.0
+    else:
+        inference_time = sum(all_run_times) / len(all_run_times)
+
+    print(f"Average prediction time for {num_frames} frames: {inference_time:.4f}s")
+    return inference_time
 
 
 if __name__ == "__main__":

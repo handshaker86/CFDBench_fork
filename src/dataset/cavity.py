@@ -321,7 +321,7 @@ class CavityFlowAutoDataset(CfdAutoDataset):
 
             inputs = processed_case_features[:-time_step_size, :]  # (T, 3, h, w)
             outputs = case_features[time_step_size:, :]  # (T, 3, h, w)
-            assert len(inputs) == len(outputs)
+            assert len(inputs) == len(outputs), f"Inputs: {len(inputs)}, Outputs: {len(outputs)}"
 
             self.case_params.append(this_case_params)
             num_steps = len(outputs)
