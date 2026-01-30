@@ -48,15 +48,20 @@ class Args(Tap):
     cal_case_accuracy: bool = True
     """Whether to calculate the case accuracy."""
 
+    measure_predict_time: bool = False
+    """Whether to measure the prediction time."""
+    measure_predict_num_frames: int = 100
+    """Number of frames to measure prediction time on."""
+
     # Dataset hyperparamters
-    data_name: str = "cavity_bc_geo_prop"
+    data_name: str = "cylinder_bc_geo_prop"
     """
     One of: 'laminar_*', 'cavity_*', 'karman_*', where * is used to
     indicate the subset to use. E.g., 'laminar_prop_geo' trains
     on the subset of laminar task with varying geometry and physical
     properties.
     """
-    data_dir: str = "/dssg/home/acct-iclover/iclover/cfdbench_dataset"
+    data_dir: str = "../cfdbench_dataset"
     """The directory that contains the CFDBench."""
     norm_props: int = 1
     """Whether to normalize the physical properties."""
@@ -66,7 +71,8 @@ class Args(Tap):
     """Number of rows in the lattice that represents the field."""
     num_cols = 64
     """Number of columns in the lattice that represents the field."""
-    # The time interval between two time step is 0.1s
+    # The time interval between two time step is 0.1s except for the cylinder task.
+    # For the cylinder task, it is 0.001s.
     delta_time: float = 1.0
     """The time step size."""
 
