@@ -7,6 +7,7 @@ from models.auto_edeeponet import AutoEDeepONet
 from models.auto_deeponet_cnn import AutoDeepONetCnn
 from models.fno.fno2d import Fno2d
 from models.auto_ffn import AutoFfn
+from models.transolver import Transolver
 from models.loss import loss_name_to_fn
 from args import Args
 
@@ -117,6 +118,24 @@ def init_model(args: Args) -> AutoCfdModel:
             hidden_dim=args.fno_hidden_dim,  # Hid. dim. in the temporal domain
             modes1=args.fno_modes_x,
             modes2=args.fno_modes_y,
+        ).cuda()
+        return model
+    elif args.model == "transolver":
+        model = Transolver(
+            in_chan=args.in_chan,
+            out_chan=args.out_chan,
+            n_case_params=n_case_params,
+            loss_fn=loss_fn,
+            n_hidden=args.transolver_hidden_dim,
+            n_layers=args.transolver_depth,
+            n_head=args.transolver_n_head,
+            slice_num=args.transolver_slice_num,
+            mlp_ratio=args.transolver_mlp_ratio,
+            dropout=args.transolver_dropout,
+            act=args.transolver_act,
+            height=n_rows,
+            width=n_cols,
+            kernel=args.transolver_kernel,
         ).cuda()
         return model
     else:

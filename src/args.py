@@ -23,7 +23,7 @@ class Args(Tap):
 
     model: str = "auto_deeponet"
     """
-    For autoregressive modeling (`train_auto.py`), it must be one of: ['auto_ffn', 'auto_deeponet', 'auto_edeeponet', 'auto_deeponet_cnn', 'unet', 'fno', 'resnet'],
+    For autoregressive modeling (`train_auto.py`), it must be one of: ['auto_ffn', 'auto_deeponet', 'auto_edeeponet', 'auto_deeponet_cnn', 'unet', 'fno', 'resnet', 'transolver'],
     for non-autoregressive modeling (`train.py`), it must be one of: ['ffn', 'deeponet'].
     """
     in_chan: int = 2
@@ -131,8 +131,26 @@ class Args(Tap):
     resnet_kernel_size: int = 7
     resnet_padding: int = 3
 
+    # Transolver hyperparameters
+    transolver_depth: int = 5
+    """Number of Transolver blocks."""
+    transolver_hidden_dim: int = 128
+    """Hidden dimension for the Transolver."""
+    transolver_n_head: int = 8
+    """Number of attention heads."""
+    transolver_slice_num: int = 32
+    """Number of physics slices (G tokens) for physics attention."""
+    transolver_mlp_ratio: int = 1
+    """MLP expansion ratio in Transolver blocks."""
+    transolver_dropout: float = 0.0
+    """Dropout rate."""
+    transolver_act: str = "gelu"
+    """Activation function name."""
+    transolver_kernel: int = 3
+    """Kernel size for Conv2d projections in physics attention."""
+
 
 def is_args_valid(args: Args):
     assert any(key in args.data_name for key in ["poiseuille", "cavity", "karman"])
     assert args.batch_size > 0
-    assert args.model in ["deeponet", "unet", "fno", "resnet"]
+    assert args.model in ["deeponet", "unet", "fno", "resnet", "transolver"]
