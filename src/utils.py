@@ -278,6 +278,23 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         )
     elif args.model == "auto_deeponet_cnn":
         dir_name = f"lr{args.lr}" f"_depth{args.autoffn_depth}"
+    elif args.model == "cno":
+        dir_name = (
+            f"lr{args.lr}"
+            + f"_d{args.cno_depth}"
+            + f"_h{args.cno_hidden_dim}"
+            + f"_k{args.cno_kernel_size}"
+            + f"_p{args.cno_padding}"
+        )
+    elif args.model == "uno":
+        dir_name = (
+            f"lr{args.lr}"
+            + f"_bd{args.uno_base_dim}"
+            + f"_lv{args.uno_levels}"
+            + f"_dpl{args.uno_depth_per_level}"
+            + f"_btd{args.uno_bottleneck_depth}"
+            + f"_k{args.uno_kernel_size}"
+        )
     elif args.model == "ffn":
         dir_name = f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
     else:
@@ -316,7 +333,7 @@ def get_robustness_dir_name(args: Args) -> Path:
 def load_best_ckpt(model, output_dir: Path):
     print(f"Finding the best checkpoint from {output_dir}")
     best_ckpt_dir = get_best_ckpt(output_dir)
-    assert best_ckpt_dir is not None
+    assert best_ckpt_dir is not None, f"Best checkpoint directory not found in {output_dir}"
     print(f"Loading best checkpoint from {best_ckpt_dir}")
     ckpt_path = best_ckpt_dir / "model.pt"
     load_ckpt(model, ckpt_path)

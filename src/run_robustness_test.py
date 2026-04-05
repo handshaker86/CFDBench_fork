@@ -37,6 +37,7 @@ def run_robustness_test(
     block_config=None,
     mask_range=None,
     noise_mode=None,
+    velocity_dim=0,
 ):
 
     # Construct log file path
@@ -88,7 +89,7 @@ def run_robustness_test(
         "--num_blocks",
         str(block_config["num_blocks"]) if block_config else "0",
         "--velocity_dim",
-        "0",       
+        str(velocity_dim),
     ]
 
     command_str = " ".join(command)
@@ -98,7 +99,7 @@ def run_robustness_test(
         subprocess.run(command, stdout=log_file, stderr=log_file)
 
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"  # Set to the GPU you want to use, or "0" for CPU 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"  # Set to the GPU you want to use, or "0" for CPU 
 
 def main():
     parser = argparse.ArgumentParser(description="Run robustness tests.")
@@ -157,6 +158,19 @@ def main():
                 mask_range=mask_range,
                 noise_mode=noise_mode,
             )
+            if model == "auto_deeponet":
+                run_robustness_test(
+                    data_name=data_name,
+                    dataset_path=dataset_path,
+                    model=model,
+                    delta_time=delta_time,
+                    noise_std=noise_std,
+                    edge_width=edge_width,
+                    block_config=None,
+                    mask_range=mask_range,
+                    noise_mode=noise_mode,
+                    velocity_dim=1,
+                )
     elif mask_range == "edge" and noise_mode == "zero":
         for edge_width in edge_width_list:
             run_robustness_test(
@@ -170,6 +184,19 @@ def main():
                 mask_range=mask_range,
                 noise_mode=noise_mode,
             )
+            if model == "auto_deeponet":
+                run_robustness_test(
+                    data_name=data_name,
+                    dataset_path=dataset_path,
+                    model=model,
+                    delta_time=delta_time,
+                    noise_std=0.0,
+                    edge_width=edge_width,
+                    block_config=None,
+                    mask_range=mask_range,
+                    noise_mode=noise_mode,
+                    velocity_dim=1,
+                )
 
     elif mask_range == "global" and noise_mode == "noise":
         for cfg, noise_std in itertools.product(block_configs, noise_std_list):
@@ -184,6 +211,19 @@ def main():
                 mask_range=mask_range,
                 noise_mode=noise_mode,
             )
+            if model == "auto_deeponet":
+                run_robustness_test(
+                    data_name=data_name,
+                    dataset_path=dataset_path,
+                    model=model,
+                    delta_time=delta_time,
+                    noise_std=noise_std,
+                    edge_width=0,
+                    block_config=cfg,
+                    mask_range=mask_range,
+                    noise_mode=noise_mode,
+                    velocity_dim=1,
+                )
 
     elif mask_range == "global" and noise_mode == "zero":
         for cfg in block_configs:
@@ -198,6 +238,19 @@ def main():
                 mask_range=mask_range,
                 noise_mode=noise_mode,
             )
+            if model == "auto_deeponet":
+                run_robustness_test(
+                    data_name=data_name,
+                    dataset_path=dataset_path,
+                    model=model,
+                    delta_time=delta_time,
+                    noise_std=0.0,
+                    edge_width=0,
+                    block_config=cfg,
+                    mask_range=mask_range,
+                    noise_mode=noise_mode,
+                    velocity_dim=1,
+                )
     else:
         raise ValueError(
             "Invalid combination of mask_range and noise_mode. Please check the arguments."
