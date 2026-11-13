@@ -297,6 +297,14 @@ def get_output_dir(args: Args, is_auto: bool = False) -> Path:
         )
     elif args.model == "ffn":
         dir_name = f"lr{args.lr}" f"_width{args.ffn_width}" f"_depth{args.ffn_depth}"
+    elif args.model == "transolver":
+        dir_name = (
+            f"lr{args.lr}"
+            + f"_d{args.transolver_depth}"
+            + f"_h{args.transolver_hidden_dim}"
+            + f"_nh{args.transolver_n_head}"
+            + f"_s{args.transolver_slice_num}"
+        )
     else:
         raise NotImplementedError
 
